@@ -1,0 +1,130 @@
+# FoKillstreak messages and GUI text.
+# Editable message tokens: {prefix}, {theme}, {muted}, {white}, {good}, {bad}
+# Common runtime tokens: {player}, {victim}, {streak}, {best_streak}, {milestone}, {version}, {author}, {cooldown}, {sender}, {command}, {index}
+
+tokens:
+  prefix: "{theme}FoKillstreak &8» {muted}"
+  theme: "#03fc88"
+  muted: "#a7b8b0"
+  white: "#ffffff"
+  good: "#3ecf8e"
+  bad: "#ff5d73"
+
+commands:
+  no-permission: "{prefix}{bad}No permission{muted}."
+  only-player: "{prefix}{bad}Player only{muted}."
+  usage-admin: "{prefix}Use {theme}/fokillstreakadmin <version|reload|editor|set>{muted}."
+  usage-set: "{prefix}Use {theme}/fokillstreakadmin set <player> <streak> <best|current>{muted}."
+  reloaded: "{prefix}{good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, and {theme}guis/{muted}."
+  reload-failed: "{prefix}{bad}Reload failed{muted}. Check console."
+  player-not-found: "{prefix}{bad}Player not found{muted}. They must be online or known to the server."
+  invalid-streak: "{prefix}{bad}Invalid streak{muted}. Use a whole number of {theme}0{muted} or higher."
+  invalid-streak-type: "{prefix}{bad}Invalid type{muted}. Use {theme}best{muted} or {theme}current{muted}."
+  streak-set: "{prefix}{good}Set {theme}{player}{muted}'s {theme}{type}{muted} streak to {theme}{streak}{muted}."
+
+killstreak:
+  cooldown-blocked: "{prefix}{bad}No streak gained{muted}. Wait {theme}{cooldown}s{muted} before killing {theme}{victim}{muted} again."
+
+broadcasts:
+  milestone: "{prefix}{theme}{player}{muted} reached a {theme}{streak}{muted} killstreak."
+
+editor:
+  saved: "{prefix}{good}Saved {theme}{setting}{muted}."
+  save-failed: "{prefix}{bad}Could not save {theme}{setting}{muted}. Check console."
+  cancelled: "{prefix}{bad}Cancelled{muted}."
+  invalid-number: "{prefix}{bad}Invalid number{muted}. Use a whole number above zero."
+  invalid-list: "{prefix}{bad}Invalid list{muted}. Use comma-separated whole numbers, like {theme}5,10,15{muted}."
+  invalid-reward-streak: "{prefix}{bad}Invalid reward streak{muted}. Use a whole number above {theme}0{muted}."
+  invalid-reward-command: "{prefix}{bad}Invalid reward command{muted}. Type a command without a leading slash."
+  reward-added: "{prefix}{good}Added reward for {theme}{streak}{muted} kills."
+  reward-deleted: "{prefix}{good}Deleted reward for {theme}{streak}{muted} kills."
+  reward-missing: "{prefix}{bad}Reward missing{muted}. It may have been edited already."
+  search-applied: "{prefix}{good}Search applied{muted}: {theme}{search}"
+  search-cleared: "{prefix}{good}Search cleared{muted}."
+
+gui:
+  admin:
+    title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ ᴇᴅɪᴛᴏʀ"
+    player-death-reset-enabled-name: "{good}ᴘᴠᴘ ᴅᴇᴀᴛʜ ʀᴇꜱᴇᴛꜱ"
+    player-death-reset-disabled-name: "{bad}ᴀʟʟ ᴅᴇᴀᴛʜꜱ ʀᴇꜱᴇᴛ"
+    player-death-reset-lore:
+      - "{white}Click to toggle natural death resets."
+      - "{white}Current: {state}"
+    broadcasts-enabled-name: "{good}ᴍɪʟᴇꜱᴛᴏɴᴇ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ"
+    broadcasts-disabled-name: "{bad}ᴍɪʟᴇꜱᴛᴏɴᴇ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ"
+    broadcasts-lore:
+      - "{white}Click to toggle milestone broadcasts."
+      - "{white}Current: {state}"
+    cooldown-enabled-name: "{good}ꜱᴀᴍᴇ-ᴠɪᴄᴛɪᴍ ᴄᴏᴏʟᴅᴏᴡɴ"
+    cooldown-disabled-name: "{bad}ꜱᴀᴍᴇ-ᴠɪᴄᴛɪᴍ ᴄᴏᴏʟᴅᴏᴡɴ"
+    cooldown-lore:
+      - "{white}Click to toggle farming protection."
+      - "{white}Current: {state}"
+    cooldown-seconds-name: "{theme}ᴄᴏᴏʟᴅᴏᴡɴ ꜱᴇᴄᴏɴᴅꜱ"
+    cooldown-seconds-lore:
+      - "{white}Click to edit in chat."
+      - "{white}Current: {theme}{seconds}s"
+    milestones-name: "{theme}ᴍɪʟᴇꜱᴛᴏɴᴇꜱ"
+    milestones-lore:
+      - "{white}Click to edit in chat."
+      - "{white}Current: {theme}{milestones}"
+    rewards-name: "{theme}ʀᴇᴡᴀʀᴅꜱ"
+    rewards-lore:
+      - "{white}Click to edit killstreak rewards."
+      - "{white}Configured: {theme}{count}"
+    reload-name: "{theme}ʀᴇʟᴏᴀᴅ ꜰɪʟᴇꜱ"
+    reload-lore:
+      - "{white}Reload config.yml and messages.yml."
+    state-enabled: "{good}Enabled"
+    state-disabled: "{bad}Disabled"
+  rewards:
+    title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ ʀᴇᴡᴀʀᴅꜱ"
+    reward-name: "{theme}{streak} ᴋɪʟʟꜱ"
+    reward-lore:
+      - "{white}Sender: {theme}{sender}"
+      - "{white}Command: {theme}{command}"
+      - "{white}Click to edit."
+    empty-name: "{bad}ɴᴏ ʀᴇᴡᴀʀᴅꜱ"
+    empty-lore:
+      - "{white}Click Add Reward below."
+    add-name: "{good}ᴀᴅᴅ ʀᴇᴡᴀʀᴅ"
+    add-lore:
+      - "{white}Create killstreak reward."
+  reward-sender:
+    title: "&8ꜱᴇʟᴇᴄᴛ ʀᴇᴡᴀʀᴅ ꜱᴇɴᴅᴇʀ"
+    console-name: "{theme}ᴄᴏɴꜱᴏʟᴇ"
+    console-lore:
+      - "{white}Run reward command from console."
+      - "{white}Streak: {theme}{streak}"
+    player-name: "{theme}ᴘʟᴀʏᴇʀ"
+    player-lore:
+      - "{white}Run reward command as killer."
+      - "{white}Streak: {theme}{streak}"
+  reward-edit:
+    title: "&8ᴇᴅɪᴛ ʀᴇᴡᴀʀᴅ"
+    streak-name: "{theme}ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+    streak-lore:
+      - "{white}Reward runs at {theme}{streak}{white} kills."
+    sender-name: "{theme}ꜱᴇɴᴅᴇʀ"
+    sender-lore:
+      - "{white}Click to cycle sender."
+      - "{console}"
+      - "{player}"
+    sender-selected: "{theme}{sender}"
+    sender-unselected: "{white}{sender}"
+    command-name: "{theme}ᴄᴏᴍᴍᴀɴᴅ"
+    command-lore:
+      - "{white}Click to edit in chat."
+      - "{white}Current: {theme}{command}"
+    delete-name: "{bad}ᴅᴇʟᴇᴛᴇ"
+    delete-lore:
+      - "{white}Open delete confirmation."
+  reward-delete:
+    title: "&8ᴅᴇʟᴇᴛᴇ ʀᴇᴡᴀʀᴅ"
+    confirm-name: "{good}ᴄᴏɴꜰɪʀᴍ"
+    confirm-lore:
+      - "{white}Delete reward for {theme}{streak}{white} kills."
+      - "{white}{command}"
+    cancel-name: "{bad}ᴄᴀɴᴄᴇʟ"
+    cancel-lore:
+      - "{white}Keep this reward."

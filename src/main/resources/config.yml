@@ -1,0 +1,51 @@
+# FoKillstreak behavior settings.
+# Messages, broadcasts, command feedback, and admin GUI text are in messages.yml.
+# The public leaderboard GUI layout/text is in guis/leaderboard.yml.
+
+death-reset:
+  # If true, natural deaths do not reset streaks. Only dying to another player resets a streak.
+  only-by-player: true
+
+same-victim-cooldown:
+  # Prevents players from farming the same victim repeatedly.
+  enabled: true
+  seconds: 60
+  notify-killer: true
+
+native-dialogs:
+  # Uses Minecraft's native dialog/input screens for search and text/number input when supported.
+  # Requires a compatible Paper or Paper-fork server with the Dialog API.
+  # Spigot and older versions automatically fall back to inventory/chat GUI mode.
+  # Set this to false to always use inventory/chat GUI mode.
+  enabled: true
+  # Uses the native dialog for /killstreak leaderboards when available.
+  # Set this to false to use the old inventory leaderboard GUI while keeping other dialogs enabled.
+  leaderboards: true
+  # Sends admins a short warning when native dialogs are enabled but unavailable and the plugin falls back.
+  warn-on-fallback: true
+
+broadcasts:
+  # Broadcast only when the killer reaches one of the exact milestones below.
+  enabled: true
+  milestones:
+    - 5
+    - 10
+    - 15
+    - 20
+    - 25
+    - 50
+
+# Reward commands run when a player reaches an exact current killstreak.
+# Add and edit entries from /fokillstreakadmin editor -> Rewards.
+# Sender CONSOLE runs the command from console. Sender PLAYER runs it as the killer.
+# Command placeholders: {player}, %player%, {uuid}, %uuid%, {streak}, %streak%, {best_streak}, %best_streak%
+# A reward key can be one streak, like "5", or multiple exact streaks, like "5, 10, 15".
+# Example:
+# rewards:
+#   "5":
+#     - sender: CONSOLE
+#       command: "give {player} diamond 1"
+#   "10, 15, 20":
+#     - sender: CONSOLE
+#       command: "points give {player} 50"
+rewards: {}

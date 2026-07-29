@@ -1,0 +1,29 @@
+name: FoKillstreak
+description: '${project.description}'
+version: '${project.version}'
+
+main: me.foesio.foKillstreak.FoKillstreak
+api-version: '1.21'
+softdepend: [ PlaceholderAPI ]
+
+authors: [ Carrotio ]
+
+commands:
+  fokillstreakadmin:
+    description: Manage FoKillstreak.
+    usage: /fokillstreakadmin <version|reload|editor|set>
+    aliases: [ killstreakadmin, ksadmin ]
+    permission: fokillstreak.admin
+  killstreak:
+    description: Open the FoKillstreak leaderboard.
+    usage: /killstreak
+    aliases: [ ks ]
+    permission: fokillstreak.use
+
+permissions:
+  fokillstreak.admin:
+    description: Allows access to FoKillstreak admin tools.
+    default: op
+  fokillstreak.use:
+    description: Allows players to open the FoKillstreak leaderboard.
+    default: true
