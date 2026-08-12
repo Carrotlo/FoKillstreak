@@ -5,6 +5,10 @@ import me.foesio.core.dialog.NativeDialogSupport;
 import me.foesio.core.dialog.TextDialogRequest;
 import me.foesio.core.editor.EditorDialogInputs;
 import me.foesio.core.gui.GuiButtonConfig;
+import me.foesio.core.gui.EntryBrowserClick;
+import me.foesio.core.gui.EntryBrowserHolder;
+import me.foesio.core.gui.EntryBrowserMenus;
+import me.foesio.core.gui.EntryBrowserRequest;
 import me.foesio.core.material.MaterialTypes;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.number.DurationParser;
@@ -27,6 +31,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -57,21 +62,8 @@ public final class KillstreakGuiManager implements Listener {
     private static final int SLOT_COOLDOWN_TOGGLE = 14;
     private static final int SLOT_COOLDOWN_SECONDS = 15;
     private static final int SLOT_PLAYER_DEATH_RESET = 16;
-    private static final int REWARD_BROWSER_SIZE = 54;
     private static final int REWARD_EDITOR_SIZE = 27;
-    private static final int REWARD_PREVIOUS_SLOT = 45;
-    private static final int REWARD_ADD_SLOT = 47;
-    private static final int REWARD_BACK_SLOT = 49;
-    private static final int REWARD_SEARCH_SLOT = 51;
-    private static final int REWARD_CLEAR_SEARCH_SLOT = 52;
-    private static final int REWARD_NEXT_SLOT = 53;
     private static final int REWARD_EDITOR_BACK_SLOT = 22;
-    private static final int[] REWARD_CONTENT_SLOTS = {
-            10, 11, 12, 13, 14, 15, 16,
-            19, 20, 21, 22, 23, 24, 25,
-            28, 29, 30, 31, 32, 33, 34,
-            37, 38, 39, 40, 41, 42, 43
-    };
 
     private final FoKillstreak plugin;
     private final ConfigService config;
@@ -147,44 +139,34 @@ public final class KillstreakGuiManager implements Listener {
     private void openRewardBrowser(Player player, int requestedPage, String search) {
         String normalizedSearch = PromptNormalizer.normalize(search);
         List<RewardCommand> rewards = filteredRewards(normalizedSearch);
-        int maxPage = Math.max(0, (rewards.size() - 1) / REWARD_CONTENT_SLOTS.length);
+        List<EntryBrowserRequest.Entry> entries = new ArrayList<>();
+        for (int index = 0; index < rewards.size(); index++) {
+            RewardCommand reward = rewards.get(index);
+            entries.add(EntryBrowserRequest.Entry.of(
+                    rewardBrowserId(reward),
+                    rewardBrowserItem(reward, index + 1)
+            ));
+        }
+
+        int maxPage = entries.isEmpty()
+                ? 0
+                : (entries.size() - 1) / EntryBrowserRequest.ENTRY_SLOTS.length;
         int page = Math.max(0, Math.min(requestedPage, maxPage));
         rewardBrowserStates.put(player.getUniqueId(), new RewardBrowserState(page, normalizedSearch));
 
-        Inventory inventory = Bukkit.createInventory(null, REWARD_BROWSER_SIZE, message("gui.rewards.title"));
-        fill(inventory, ADMIN_FILLER);
-
-        if (rewards.isEmpty()) {
-            inventory.setItem(22, item(
-                    Material.BARRIER,
-                    message("gui.rewards.empty-name"),
-                    messageList("gui.rewards.empty-lore", Map.of())
-            ));
-        } else {
-            int start = page * REWARD_CONTENT_SLOTS.length;
-            int end = Math.min(rewards.size(), start + REWARD_CONTENT_SLOTS.length);
-            for (int i = start; i < end; i++) {
-                RewardCommand reward = rewards.get(i);
-                inventory.setItem(REWARD_CONTENT_SLOTS[i - start], rewardBrowserItem(reward, i + 1));
-            }
-        }
-
-        if (page > 0) {
-            inventory.setItem(REWARD_PREVIOUS_SLOT, BUTTONS.previousPage(page, maxPage));
-        }
-        inventory.setItem(REWARD_ADD_SLOT, item(
-                Material.EMERALD,
-                message("gui.rewards.add-name"),
-                messageList("gui.rewards.add-lore", Map.of())
-        ));
-        inventory.setItem(REWARD_BACK_SLOT, BUTTONS.back());
-        inventory.setItem(REWARD_SEARCH_SLOT, BUTTONS.search(normalizedSearch));
-        inventory.setItem(REWARD_CLEAR_SEARCH_SLOT, BUTTONS.clearSearch("rewards"));
-        if (page < maxPage) {
-            inventory.setItem(REWARD_NEXT_SLOT, BUTTONS.nextPage(page, maxPage));
-        }
-
-        player.openInventory(inventory);
+        EntryBrowserMenus.open(player, EntryBrowserRequest.builder()
+                .title(message("gui.rewards.title"))
+                .entries(entries)
+                .page(page)
+                .filter(normalizedSearch)
+                .buttons(BUTTONS)
+                .showBack(true)
+                .addButton(item(
+                        Material.ANVIL,
+                        message("gui.rewards.add-name"),
+                        messageList("gui.rewards.add-lore", Map.of())
+                ))
+                .build());
     }
 
     private void openRewardSenderSelector(Player player, int streak) {
@@ -356,12 +338,17 @@ public final class KillstreakGuiManager implements Listener {
             return;
         }
 
+        if (event.getView().getTopInventory().getHolder() instanceof EntryBrowserHolder holder) {
+            event.setCancelled(true);
+            if (event.getRawSlot() < event.getView().getTopInventory().getSize()) {
+                handleRewardBrowserClick(player, event.getSlot(), holder);
+            }
+            return;
+        }
+
         if (title.equals(message("gui.admin.title"))) {
             event.setCancelled(true);
             handleAdminEditorClick(player, event.getInventory().getSize(), event.getRawSlot());
-        } else if (title.equals(message("gui.rewards.title"))) {
-            event.setCancelled(true);
-            handleRewardBrowserClick(player, event.getRawSlot());
         } else if (title.equals(message("gui.reward-sender.title"))) {
             event.setCancelled(true);
             handleRewardSenderClick(player, event.getRawSlot());
@@ -371,6 +358,13 @@ public final class KillstreakGuiManager implements Listener {
         } else if (title.equals(message("gui.reward-delete.title"))) {
             event.setCancelled(true);
             handleRewardDeleteClick(player, event.getRawSlot());
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof EntryBrowserHolder) {
+            event.setCancelled(true);
         }
     }
 
@@ -427,30 +421,31 @@ public final class KillstreakGuiManager implements Listener {
         }
     }
 
-    private void handleRewardBrowserClick(Player player, int rawSlot) {
-        if (rawSlot < 0 || rawSlot >= REWARD_BROWSER_SIZE) {
-            return;
-        }
-
-        RewardBrowserState state = rewardBrowserStates.getOrDefault(player.getUniqueId(), new RewardBrowserState(0, ""));
-        int maxPage = rewardMaxPage(state.search());
-        if (rawSlot == REWARD_SEARCH_SLOT) {
-            beginRewardSearchPrompt(player);
-        } else if (rawSlot == REWARD_CLEAR_SEARCH_SLOT) {
-            player.sendMessage(message("editor.search-cleared"));
-            openRewardBrowser(player, 0, "");
-        } else if (rawSlot == REWARD_PREVIOUS_SLOT && state.page() > 0) {
-            openRewardBrowser(player, state.page() - 1, state.search());
-        } else if (rawSlot == REWARD_ADD_SLOT) {
-            beginRewardStreakPrompt(player);
-        } else if (rawSlot == REWARD_NEXT_SLOT && state.page() < maxPage) {
-            openRewardBrowser(player, state.page() + 1, state.search());
-        } else if (rawSlot == REWARD_BACK_SLOT) {
-            openAdminEditor(player);
-        } else {
-            RewardCommand reward = rewardAtSlot(rawSlot, state);
-            if (reward != null) {
-                openRewardEdit(player, reward);
+    private void handleRewardBrowserClick(Player player, int rawSlot, EntryBrowserHolder holder) {
+        EntryBrowserClick click = EntryBrowserMenus.handleClick(rawSlot, holder);
+        int page = holder.request().page();
+        String search = holder.request().filter();
+        switch (click.action()) {
+            case ENTRY -> {
+                RewardCommand reward = findRewardByBrowserId(click.entryId());
+                if (reward == null) {
+                    player.sendMessage(message("editor.reward-missing"));
+                    openRewardBrowser(player, page, search);
+                } else {
+                    openRewardEdit(player, reward);
+                }
+            }
+            case ADD -> beginRewardStreakPrompt(player);
+            case BACK -> openAdminEditor(player);
+            case SEARCH -> beginRewardSearchPrompt(player, new RewardBrowserState(page, search));
+            case CLEAR_SEARCH -> {
+                player.sendMessage(message("editor.search-cleared"));
+                openRewardBrowser(player, 0, "");
+            }
+            case PREVIOUS_PAGE -> openRewardBrowser(player, page - 1, search);
+            case NEXT_PAGE -> openRewardBrowser(player, page + 1, search);
+            case NONE -> {
+                // Filler and inactive navigation slots intentionally do nothing.
             }
         }
     }
@@ -623,15 +618,21 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     private void beginRewardSearchPrompt(Player player) {
-        RewardBrowserState state = rewardBrowserStates.getOrDefault(player.getUniqueId(), new RewardBrowserState(0, ""));
+        beginRewardSearchPrompt(
+                player,
+                rewardBrowserStates.getOrDefault(player.getUniqueId(), new RewardBrowserState(0, ""))
+        );
+    }
+
+    private void beginRewardSearchPrompt(Player player, RewardBrowserState state) {
         openTextInput(player, new TextDialogRequest(
-                "Search Rewards",
+                "Search",
                 List.of("Search by streak, sender, or command."),
                 "Search",
                 state.search(),
-                "",
+                "reward id or command",
                 DialogButton.search(),
-                DialogButton.cancel("Back"),
+                DialogButton.cancel(),
                 320,
                 300,
                 80,
@@ -804,10 +805,6 @@ public final class KillstreakGuiManager implements Listener {
         return filtered;
     }
 
-    private int rewardMaxPage(String search) {
-        return Math.max(0, (filteredRewards(search).size() - 1) / REWARD_CONTENT_SLOTS.length);
-    }
-
     private ItemStack rewardBrowserItem(RewardCommand reward, int displayIndex) {
         return item(
                 Material.COMMAND_BLOCK,
@@ -821,33 +818,36 @@ public final class KillstreakGuiManager implements Listener {
         );
     }
 
-    private RewardCommand rewardAtSlot(int rawSlot, RewardBrowserState state) {
-        int contentIndex = contentIndex(rawSlot);
-        if (contentIndex < 0) {
-            return null;
-        }
-
-        int rewardIndex = state.page() * REWARD_CONTENT_SLOTS.length + contentIndex;
-        List<RewardCommand> rewards = filteredRewards(state.search());
-        if (rewardIndex < 0 || rewardIndex >= rewards.size()) {
-            return null;
-        }
-        return rewards.get(rewardIndex);
+    private String rewardBrowserId(RewardCommand reward) {
+        return reward.configKey() + "#" + reward.index();
     }
 
-    private int contentIndex(int rawSlot) {
-        for (int index = 0; index < REWARD_CONTENT_SLOTS.length; index++) {
-            if (REWARD_CONTENT_SLOTS[index] == rawSlot) {
-                return index;
-            }
+    private RewardCommand findRewardByBrowserId(String browserId) {
+        if (browserId == null) {
+            return null;
         }
-        return -1;
+        int separator = browserId.lastIndexOf('#');
+        if (separator <= 0 || separator == browserId.length() - 1) {
+            return null;
+        }
+        try {
+            return findReward(
+                    0,
+                    browserId.substring(0, separator),
+                    Integer.parseInt(browserId.substring(separator + 1))
+            );
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private RewardCommand findReward(int streak, String configKey, int index) {
-        for (RewardCommand reward : config.getRewardsForStreak(streak)) {
-            if (reward.configKey().equals(configKey) && reward.index() == index) {
-                return reward;
+        List<Integer> streaks = streak > 0 ? List.of(streak) : config.getRewardStreaks();
+        for (int rewardStreak : streaks) {
+            for (RewardCommand reward : config.getRewardsForStreak(rewardStreak)) {
+                if (reward.configKey().equals(configKey) && reward.index() == index) {
+                    return reward;
+                }
             }
         }
         return null;
