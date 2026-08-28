@@ -2,6 +2,7 @@ package me.foesio.foKillstreak.listener;
 
 import me.foesio.core.command.CommandPlaceholders;
 import me.foesio.core.message.FoMessageService;
+import me.foesio.core.sound.FoSoundService;
 import me.foesio.foKillstreak.config.ConfigService;
 import me.foesio.foKillstreak.config.ConfigService.RewardCommand;
 import me.foesio.foKillstreak.config.ConfigService.RewardSender;
@@ -29,13 +30,15 @@ public final class KillstreakListener implements Listener {
     private final ConfigService config;
     private final FoMessageService messages;
     private final StreakStorage storage;
+    private final FoSoundService sounds;
     private final Map<CooldownKey, Long> sameVictimCooldowns = new ConcurrentHashMap<>();
     private long lastCooldownCleanupMillis;
 
-    public KillstreakListener(ConfigService config, FoMessageService messages, StreakStorage storage) {
+    public KillstreakListener(ConfigService config, FoMessageService messages, StreakStorage storage, FoSoundService sounds) {
         this.config = config;
         this.messages = messages;
         this.storage = storage;
+        this.sounds = sounds;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -44,7 +47,11 @@ public final class KillstreakListener implements Listener {
         Player killer = victim.getKiller();
 
         if (shouldResetVictim(killer, victim)) {
+            boolean lostStreak = storage.currentStreak(victim.getUniqueId()) > 0;
             storage.reset(victim);
+            if (lostStreak) {
+                sounds.play(victim, "killstreak.lost");
+            }
         }
         if (killer == null || killer.getUniqueId().equals(victim.getUniqueId())) {
             return;
@@ -58,12 +65,16 @@ public final class KillstreakListener implements Listener {
                         "cooldown", String.valueOf(remainingCooldown)
                 ));
             }
+            sounds.play(killer, "killstreak.denied");
             return;
         }
 
         rememberKill(killer.getUniqueId(), victim.getUniqueId());
         StreakRecord record = storage.addKill(killer);
-        runRewards(killer, record);
+        sounds.playWithPitchVariation(killer, "killstreak.kill", 0.04f);
+        if (runRewards(killer, record)) {
+            sounds.play(killer, "killstreak.reward");
+        }
         maybeBroadcastMilestone(killer, record);
     }
 
@@ -131,9 +142,11 @@ public final class KillstreakListener implements Listener {
                 "best_streak", String.valueOf(record.bestStreak()),
                 "milestone", String.valueOf(record.currentStreak())
         )));
+        sounds.play(killer, "killstreak.milestone");
     }
 
-    private void runRewards(Player killer, StreakRecord record) {
+    private boolean runRewards(Player killer, StreakRecord record) {
+        boolean dispatched = false;
         for (RewardCommand reward : config.getRewardsForStreak(record.currentStreak())) {
             String command = applyRewardPlaceholders(killer, record, reward.command());
             if (command.isBlank()) {
@@ -142,7 +155,9 @@ public final class KillstreakListener implements Listener {
 
             CommandSender sender = reward.sender() == RewardSender.CONSOLE ? Bukkit.getConsoleSender() : killer;
             Bukkit.dispatchCommand(sender, command);
+            dispatched = true;
         }
+        return dispatched;
     }
 
     private String applyRewardPlaceholders(Player killer, StreakRecord record, String command) {

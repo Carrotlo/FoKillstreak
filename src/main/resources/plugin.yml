@@ -13,12 +13,10 @@ commands:
     description: Manage FoKillstreak.
     usage: /fokillstreakadmin <version|reload|editor|set>
     aliases: [ killstreakadmin, ksadmin ]
-    permission: fokillstreak.admin
   killstreak:
     description: Open the FoKillstreak leaderboard.
     usage: /killstreak
     aliases: [ ks ]
-    permission: fokillstreak.use
 
 permissions:
   fokillstreak.admin:

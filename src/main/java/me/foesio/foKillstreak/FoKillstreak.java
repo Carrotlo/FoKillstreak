@@ -10,6 +10,10 @@ import me.foesio.core.message.FoMessageService;
 import me.foesio.core.placeholder.FoPlaceholders;
 import me.foesio.core.reload.FoReloadRegistry;
 import me.foesio.core.reload.FoReloadResult;
+import me.foesio.core.sound.FoAdminSounds;
+import me.foesio.core.sound.FoEditorSounds;
+import me.foesio.core.sound.FoGuiSounds;
+import me.foesio.core.sound.FoSoundService;
 import me.foesio.core.update.UpdateNoticeService;
 import me.foesio.foKillstreak.command.AdminSetSubcommand;
 import me.foesio.foKillstreak.command.PlayerCommand;
@@ -38,6 +42,10 @@ public final class FoKillstreak extends JavaPlugin {
     private StreakStorage streakStorage;
     private KillstreakGuiManager guiManager;
     private UpdateNoticeService updateNotices;
+    private FoSoundService sounds;
+    private FoAdminSounds adminSounds;
+    private FoEditorSounds editorSounds;
+    private FoGuiSounds guiSounds;
 
     @Override
     public void onEnable() {
@@ -46,9 +54,9 @@ public final class FoKillstreak extends JavaPlugin {
 
         configService.load();
         guiConfigService.load();
-        messageService = FoMessageService.load(this, messageMigrations());
         refreshCoreContext();
-        updateNotices = core.createUpdateNotices(messageService, MODRINTH_PROJECT_ID).start();
+        messageService = FoMessageService.load(this, messageMigrations());
+        updateNotices = core.createUpdateNotices(messageService, MODRINTH_PROJECT_ID, adminSounds).start();
 
         streakStorage = new StreakStorage(this);
         if (!streakStorage.open()) {
@@ -56,9 +64,9 @@ public final class FoKillstreak extends JavaPlugin {
             return;
         }
 
-        guiManager = new KillstreakGuiManager(this, configService, guiConfigService, messageService, streakStorage, core.nativeDialogs());
+        guiManager = new KillstreakGuiManager(this, configService, guiConfigService, messageService, streakStorage, core.nativeDialogs(), sounds, editorSounds, guiSounds);
 
-        getServer().getPluginManager().registerEvents(new KillstreakListener(configService, messageService, streakStorage), this);
+        getServer().getPluginManager().registerEvents(new KillstreakListener(configService, messageService, streakStorage, sounds), this);
         getServer().getPluginManager().registerEvents(guiManager, this);
 
         registerCommands();
@@ -74,14 +82,19 @@ public final class FoKillstreak extends JavaPlugin {
             core.close();
             core = null;
         }
+        sounds = null;
+        adminSounds = null;
+        editorSounds = null;
+        guiSounds = null;
     }
 
     public boolean reloadPluginFiles() {
         FoReloadResult result = FoReloadRegistry.create()
                 .add("config", configService::load)
                 .add("guis", guiConfigService::load)
-                .addMessages(messageService)
                 .add("native dialogs", this::refreshCoreContext)
+                .add("sounds", sounds::reload)
+                .addMessages(messageService)
                 .add("leaderboard dialogs", () -> guiManager.reloadNativeDialogs(core.nativeDialogs()))
                 .reload();
 
@@ -100,10 +113,20 @@ public final class FoKillstreak extends JavaPlugin {
         return core;
     }
 
+    public FoAdminSounds adminSounds() {
+        return adminSounds;
+    }
+
     private void refreshCoreContext() {
         FoCoreContext previousCore = core;
         FoCoreContext refreshedCore = FoPluginCore.create(this, configService.nativeDialogSettings());
         core = refreshedCore;
+        if (sounds == null) {
+            sounds = core.createSounds();
+            adminSounds = FoAdminSounds.create(sounds);
+            editorSounds = FoEditorSounds.create(sounds);
+            guiSounds = FoGuiSounds.create(sounds);
+        }
         if (previousCore != null) {
             previousCore.close();
         }
@@ -139,14 +162,15 @@ public final class FoKillstreak extends JavaPlugin {
                 .commandName("fokillstreakadmin")
                 .permission("fokillstreak.admin")
                 .versionCommand(false)
+                .adminSounds(adminSounds)
                 .adminMessages(adminMessages())
                 .addSubcommand(versionSubcommand())
                 .addSubcommand(reloadSubcommand())
                 .addSubcommand(editorSubcommand())
-                .addSubcommand(AdminSetSubcommand.create(streakStorage))
+                .addSubcommand(AdminSetSubcommand.create(streakStorage, adminSounds))
                 .register();
 
-        PlayerCommand playerCommand = new PlayerCommand(messageService, guiManager);
+        PlayerCommand playerCommand = new PlayerCommand(messageService, guiManager, adminSounds);
         PluginCommand player = getCommand("killstreak");
         if (player != null) {
             player.setExecutor(playerCommand);
@@ -181,8 +205,14 @@ public final class FoKillstreak extends JavaPlugin {
                 return true;
             }
             if (reloadPluginFiles()) {
+                if (context.sender() instanceof org.bukkit.entity.Player player) {
+                    adminSounds.reload(player);
+                }
                 messageService.send(context.sender(), "commands.reloaded", MessageFallbacks.string("commands.reloaded"));
             } else {
+                if (context.sender() instanceof org.bukkit.entity.Player player) {
+                    adminSounds.reloadError(player);
+                }
                 messageService.send(context.sender(), "commands.reload-failed", MessageFallbacks.string("commands.reload-failed"));
             }
             return true;

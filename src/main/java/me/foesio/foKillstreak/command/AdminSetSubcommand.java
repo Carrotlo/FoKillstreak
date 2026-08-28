@@ -3,6 +3,7 @@ package me.foesio.foKillstreak.command;
 import me.foesio.core.command.FoAdminCommandContext;
 import me.foesio.core.command.FoAdminSubcommand;
 import me.foesio.core.number.LargeNumberParser;
+import me.foesio.core.sound.FoAdminSounds;
 import me.foesio.foKillstreak.data.LeaderboardType;
 import me.foesio.foKillstreak.data.StreakRecord;
 import me.foesio.foKillstreak.data.StreakStorage;
@@ -26,13 +27,15 @@ public final class AdminSetSubcommand {
     private static final List<String> STREAK_TYPES = List.of("best", "current");
 
     private final StreakStorage storage;
+    private final FoAdminSounds adminSounds;
 
-    private AdminSetSubcommand(StreakStorage storage) {
+    private AdminSetSubcommand(StreakStorage storage, FoAdminSounds adminSounds) {
         this.storage = storage;
+        this.adminSounds = adminSounds;
     }
 
-    public static FoAdminSubcommand create(StreakStorage storage) {
-        AdminSetSubcommand command = new AdminSetSubcommand(storage);
+    public static FoAdminSubcommand create(StreakStorage storage, FoAdminSounds adminSounds) {
+        AdminSetSubcommand command = new AdminSetSubcommand(storage, adminSounds);
         return FoAdminSubcommand.builder("set", command::execute)
                 .usage("set <player> <streak> <best|current>")
                 .tabCompleter(command::tabComplete)
@@ -42,24 +45,28 @@ public final class AdminSetSubcommand {
     private boolean execute(FoAdminCommandContext context) {
         if (context.args().length != 4) {
             context.messages().send(context.sender(), "commands.usage-set", MessageFallbacks.string("commands.usage-set"));
+            adminSounds.updateError(context.sender());
             return true;
         }
 
         TargetPlayer target = resolveTarget(context.arg(1));
         if (target == null) {
             context.messages().send(context.sender(), "commands.player-not-found", MessageFallbacks.string("commands.player-not-found"));
+            adminSounds.updateError(context.sender());
             return true;
         }
 
         int streak = parseNonNegativeInt(context.arg(2));
         if (streak < 0) {
             context.messages().send(context.sender(), "commands.invalid-streak", MessageFallbacks.string("commands.invalid-streak"));
+            adminSounds.updateError(context.sender());
             return true;
         }
 
         LeaderboardType type = parseType(context.arg(3));
         if (type == null) {
             context.messages().send(context.sender(), "commands.invalid-streak-type", MessageFallbacks.string("commands.invalid-streak-type"));
+            adminSounds.updateError(context.sender());
             return true;
         }
 

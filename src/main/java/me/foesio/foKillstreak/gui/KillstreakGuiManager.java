@@ -13,6 +13,9 @@ import me.foesio.core.material.MaterialTypes;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.number.DurationParser;
 import me.foesio.core.number.LargeNumberParser;
+import me.foesio.core.sound.FoEditorSounds;
+import me.foesio.core.sound.FoGuiSounds;
+import me.foesio.core.sound.FoSoundService;
 import me.foesio.core.text.FoText;
 import me.foesio.core.text.PromptNormalizer;
 import me.foesio.foKillstreak.FoKillstreak;
@@ -70,6 +73,9 @@ public final class KillstreakGuiManager implements Listener {
     private final GuiConfigService guiConfig;
     private final FoMessageService messages;
     private final StreakStorage storage;
+    private final FoSoundService sounds;
+    private final FoEditorSounds editorSounds;
+    private final FoGuiSounds guiSounds;
     private LeaderboardDialogService leaderboardDialogs;
     private final Map<UUID, Long> leaderboardOpenTimes = new ConcurrentHashMap<>();
     private final Map<UUID, Long> leaderboardTabTimes = new ConcurrentHashMap<>();
@@ -78,12 +84,15 @@ public final class KillstreakGuiManager implements Listener {
     private final Map<UUID, PendingRewardState> pendingRewardStates = new ConcurrentHashMap<>();
     private final Map<UUID, RewardDeleteState> rewardDeleteStates = new ConcurrentHashMap<>();
 
-    public KillstreakGuiManager(FoKillstreak plugin, ConfigService config, GuiConfigService guiConfig, FoMessageService messages, StreakStorage storage, NativeDialogSupport nativeDialogs) {
+    public KillstreakGuiManager(FoKillstreak plugin, ConfigService config, GuiConfigService guiConfig, FoMessageService messages, StreakStorage storage, NativeDialogSupport nativeDialogs, FoSoundService sounds, FoEditorSounds editorSounds, FoGuiSounds guiSounds) {
         this.plugin = plugin;
         this.config = config;
         this.guiConfig = guiConfig;
         this.messages = messages;
         this.storage = storage;
+        this.sounds = sounds;
+        this.editorSounds = editorSounds;
+        this.guiSounds = guiSounds;
         reloadNativeDialogs(nativeDialogs);
     }
 
@@ -95,6 +104,7 @@ public final class KillstreakGuiManager implements Listener {
         if (!canOpenLeaderboard(player)) {
             return;
         }
+        guiSounds.open(player);
         openLeaderboard(player, LeaderboardType.CURRENT);
     }
 
@@ -102,6 +112,7 @@ public final class KillstreakGuiManager implements Listener {
         if (!canUseLeaderboardAction(player, leaderboardTabTimes, LEADERBOARD_TAB_COOLDOWN_MILLIS)) {
             return;
         }
+        sounds.play(player, "gui.select");
         openLeaderboard(player, type);
     }
 
@@ -170,7 +181,14 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     private void openRewardSenderSelector(Player player, int streak) {
+        openRewardSenderSelector(player, streak, false);
+    }
+
+    private void openRewardSenderSelector(Player player, int streak, boolean playOpenSound) {
         pendingRewardStates.put(player.getUniqueId(), new PendingRewardState(streak));
+        if (playOpenSound) {
+            editorSounds.open(player);
+        }
         Inventory inventory = Bukkit.createInventory(null, REWARD_EDITOR_SIZE, message("gui.reward-sender.title"));
         fill(inventory, ADMIN_FILLER);
 
@@ -193,9 +211,15 @@ public final class KillstreakGuiManager implements Listener {
         openRewardEdit(player, reward.streak(), reward.configKey(), reward.index());
     }
 
+    private void enterRewardEdit(Player player, RewardCommand reward) {
+        editorSounds.open(player);
+        openRewardEdit(player, reward);
+    }
+
     private void openRewardEdit(Player player, int streak, String configKey, int index) {
         RewardCommand reward = findReward(streak, configKey, index);
         if (reward == null) {
+            editorSounds.error(player);
             player.sendMessage(message("editor.reward-missing"));
             openRewardBrowser(player);
             return;
@@ -237,12 +261,14 @@ public final class KillstreakGuiManager implements Listener {
     private void openRewardDeleteConfirm(Player player, RewardEditState state) {
         RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
         if (reward == null) {
+            editorSounds.error(player);
             player.sendMessage(message("editor.reward-missing"));
             openRewardBrowser(player);
             return;
         }
 
         rewardDeleteStates.put(player.getUniqueId(), new RewardDeleteState(state.streak(), state.configKey(), state.index()));
+        editorSounds.open(player);
         Inventory inventory = Bukkit.createInventory(null, REWARD_EDITOR_SIZE, message("gui.reward-delete.title"));
         fill(inventory, ADMIN_FILLER);
 
@@ -264,6 +290,13 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     public void openAdminEditor(Player player) {
+        openAdminEditor(player, true);
+    }
+
+    private void openAdminEditor(Player player, boolean playOpenSound) {
+        if (playOpenSound) {
+            editorSounds.open(player);
+        }
         Inventory inventory = Bukkit.createInventory(null, ADMIN_SIZE, message("gui.admin.title"));
         fill(inventory, ADMIN_FILLER);
 
@@ -410,14 +443,17 @@ public final class KillstreakGuiManager implements Listener {
         } else if (rawSlot == SLOT_MILESTONES) {
             beginMilestonesPrompt(player);
         } else if (rawSlot == SLOT_REWARDS) {
+            editorSounds.open(player);
             openRewardBrowser(player, 0, "");
         } else if (rawSlot == SLOT_RELOAD) {
             if (plugin.reloadPluginFiles()) {
+                plugin.adminSounds().reload(player);
                 player.sendMessage(message("commands.reloaded"));
             } else {
+                plugin.adminSounds().reloadError(player);
                 player.sendMessage(message("commands.reload-failed"));
             }
-            openAdminEditor(player);
+            openAdminEditor(player, false);
         }
     }
 
@@ -429,21 +465,38 @@ public final class KillstreakGuiManager implements Listener {
             case ENTRY -> {
                 RewardCommand reward = findRewardByBrowserId(click.entryId());
                 if (reward == null) {
+                    editorSounds.error(player);
                     player.sendMessage(message("editor.reward-missing"));
                     openRewardBrowser(player, page, search);
                 } else {
-                    openRewardEdit(player, reward);
+                    enterRewardEdit(player, reward);
                 }
             }
-            case ADD -> beginRewardStreakPrompt(player);
-            case BACK -> openAdminEditor(player);
-            case SEARCH -> beginRewardSearchPrompt(player, new RewardBrowserState(page, search));
+            case ADD -> {
+                editorSounds.add(player);
+                beginRewardStreakPrompt(player);
+            }
+            case BACK -> {
+                editorSounds.back(player);
+                openAdminEditor(player, false);
+            }
+            case SEARCH -> {
+                editorSounds.search(player);
+                beginRewardSearchPrompt(player, new RewardBrowserState(page, search));
+            }
             case CLEAR_SEARCH -> {
+                editorSounds.clearSearch(player);
                 player.sendMessage(message("editor.search-cleared"));
                 openRewardBrowser(player, 0, "");
             }
-            case PREVIOUS_PAGE -> openRewardBrowser(player, page - 1, search);
-            case NEXT_PAGE -> openRewardBrowser(player, page + 1, search);
+            case PREVIOUS_PAGE -> {
+                editorSounds.previousPage(player);
+                openRewardBrowser(player, page - 1, search);
+            }
+            case NEXT_PAGE -> {
+                editorSounds.nextPage(player);
+                openRewardBrowser(player, page + 1, search);
+            }
             case NONE -> {
                 // Filler and inactive navigation slots intentionally do nothing.
             }
@@ -462,10 +515,13 @@ public final class KillstreakGuiManager implements Listener {
         }
 
         if (rawSlot == 11) {
+            editorSounds.add(player);
             beginAddRewardCommandPrompt(player, state.streak(), RewardSender.CONSOLE);
         } else if (rawSlot == 15) {
+            editorSounds.add(player);
             beginAddRewardCommandPrompt(player, state.streak(), RewardSender.PLAYER);
         } else if (rawSlot == REWARD_EDITOR_BACK_SLOT) {
+            editorSounds.back(player);
             pendingRewardStates.remove(player.getUniqueId());
             openRewardBrowser(player);
         }
@@ -484,6 +540,7 @@ public final class KillstreakGuiManager implements Listener {
 
         RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
         if (reward == null) {
+            editorSounds.error(player);
             player.sendMessage(message("editor.reward-missing"));
             openRewardBrowser(player);
             return;
@@ -492,8 +549,10 @@ public final class KillstreakGuiManager implements Listener {
         if (rawSlot == 12) {
             RewardSender next = reward.sender() == RewardSender.CONSOLE ? RewardSender.PLAYER : RewardSender.CONSOLE;
             if (config.updateRewardSender(reward.configKey(), reward.index(), next)) {
+                editorSounds.cycle(player);
                 player.sendMessage(message("editor.saved", Map.of("setting", "reward sender")));
             } else {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.save-failed", Map.of("setting", "reward sender")));
             }
             openRewardEdit(player, reward.streak(), reward.configKey(), reward.index());
@@ -502,6 +561,7 @@ public final class KillstreakGuiManager implements Listener {
         } else if (rawSlot == 16) {
             openRewardDeleteConfirm(player, state);
         } else if (rawSlot == REWARD_EDITOR_BACK_SLOT) {
+            editorSounds.back(player);
             openRewardBrowser(player);
         }
     }
@@ -520,16 +580,20 @@ public final class KillstreakGuiManager implements Listener {
         if (rawSlot == 11) {
             RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
             if (reward == null) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.reward-missing"));
             } else if (config.removeReward(reward.configKey(), reward.index())) {
+                editorSounds.delete(player);
                 player.sendMessage(message("editor.reward-deleted", Map.of("streak", String.valueOf(state.streak()))));
             } else {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.save-failed", Map.of("setting", "reward")));
             }
             rewardDeleteStates.remove(player.getUniqueId());
             rewardEditStates.remove(player.getUniqueId());
             openRewardBrowser(player);
         } else if (rawSlot == 15) {
+            editorSounds.back(player);
             rewardDeleteStates.remove(player.getUniqueId());
             openRewardEdit(player, state.streak(), state.configKey(), state.index());
         }
@@ -538,14 +602,17 @@ public final class KillstreakGuiManager implements Listener {
     private void toggle(Player player, String path, String settingName) {
         boolean newValue = !config.getBoolean(path, true);
         if (config.setAndSave(path, newValue)) {
+            editorSounds.toggle(player, newValue);
             player.sendMessage(message("editor.saved", Map.of("setting", settingName)));
         } else {
+            editorSounds.error(player);
             player.sendMessage(message("editor.save-failed", Map.of("setting", settingName)));
         }
-        openAdminEditor(player);
+        openAdminEditor(player, false);
     }
 
     private void beginCooldownPrompt(Player player) {
+        editorSounds.open(player);
         openTextInput(player, new TextDialogRequest(
                 "Cooldown",
                 List.of("Use seconds or a duration like 1m."),
@@ -563,29 +630,34 @@ public final class KillstreakGuiManager implements Listener {
         ), input -> {
             var duration = DurationParser.parse(input);
             if (duration.isEmpty()) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.invalid-number"));
-                openAdminEditor(player);
+                openAdminEditor(player, false);
                 return;
             }
 
             long parsedSeconds = duration.get().secondsFloor();
             if (parsedSeconds <= 0 || parsedSeconds > Integer.MAX_VALUE) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.invalid-number"));
-                openAdminEditor(player);
+                openAdminEditor(player, false);
                 return;
             }
             int seconds = (int) parsedSeconds;
 
             if (config.setAndSave("same-victim-cooldown.seconds", seconds)) {
+                editorSounds.save(player);
                 player.sendMessage(message("editor.saved", Map.of("setting", "cooldown seconds")));
             } else {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.save-failed", Map.of("setting", "cooldown seconds")));
             }
-            openAdminEditor(player);
-        }, () -> openAdminEditor(player));
+            openAdminEditor(player, false);
+        }, () -> openAdminEditor(player, false));
     }
 
     private void beginMilestonesPrompt(Player player) {
+        editorSounds.open(player);
         openTextInput(player, new TextDialogRequest(
                 "Milestones",
                 List.of("Use comma-separated whole numbers."),
@@ -603,18 +675,21 @@ public final class KillstreakGuiManager implements Listener {
         ), input -> {
             List<Integer> milestones = parseMilestones(input);
             if (milestones.isEmpty()) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.invalid-list"));
-                openAdminEditor(player);
+                openAdminEditor(player, false);
                 return;
             }
 
             if (config.setAndSave("broadcasts.milestones", milestones)) {
+                editorSounds.save(player);
                 player.sendMessage(message("editor.saved", Map.of("setting", "milestones")));
             } else {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.save-failed", Map.of("setting", "milestones")));
             }
-            openAdminEditor(player);
-        }, () -> openAdminEditor(player));
+            openAdminEditor(player, false);
+        }, () -> openAdminEditor(player, false));
     }
 
     private void beginRewardSearchPrompt(Player player) {
@@ -663,12 +738,13 @@ public final class KillstreakGuiManager implements Listener {
         ), input -> {
             int streak = parsePositiveInt(input);
             if (streak <= 0) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.invalid-reward-streak"));
                 openRewardBrowser(player);
                 return;
             }
 
-            openRewardSenderSelector(player, streak);
+            openRewardSenderSelector(player, streak, true);
         }, () -> openRewardBrowser(player));
     }
 
@@ -676,6 +752,7 @@ public final class KillstreakGuiManager implements Listener {
         openTextInput(player, rewardCommandRequest(streak, sender, ""), input -> {
             String command = normalizeCommand(input);
             if (command.isBlank()) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.invalid-reward-command"));
                 openRewardSenderSelector(player, streak);
                 return;
@@ -683,9 +760,11 @@ public final class KillstreakGuiManager implements Listener {
 
             if (config.addReward(streak, sender, command)) {
                 pendingRewardStates.remove(player.getUniqueId());
+                editorSounds.save(player);
                 player.sendMessage(message("editor.reward-added", Map.of("streak", String.valueOf(streak))));
                 openRewardBrowser(player, 0, "");
             } else {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.save-failed", Map.of("setting", "reward")));
                 openRewardBrowser(player);
             }
@@ -695,22 +774,27 @@ public final class KillstreakGuiManager implements Listener {
     private void beginEditRewardCommandPrompt(Player player, RewardEditState state) {
         RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
         if (reward == null) {
+            editorSounds.error(player);
             player.sendMessage(message("editor.reward-missing"));
             openRewardBrowser(player);
             return;
         }
 
+        editorSounds.open(player);
         openTextInput(player, rewardCommandRequest(reward.streak(), reward.sender(), reward.command()), input -> {
             String command = normalizeCommand(input);
             if (command.isBlank()) {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.invalid-reward-command"));
                 openRewardEdit(player, state.streak(), state.configKey(), state.index());
                 return;
             }
 
             if (config.updateRewardCommand(state.configKey(), state.index(), command)) {
+                editorSounds.save(player);
                 player.sendMessage(message("editor.saved", Map.of("setting", "reward command")));
             } else {
+                editorSounds.error(player);
                 player.sendMessage(message("editor.save-failed", Map.of("setting", "reward command")));
             }
             openRewardEdit(player, state.streak(), state.configKey(), state.index());
