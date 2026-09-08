@@ -1,16 +1,22 @@
 package me.foesio.foKillstreak.gui;
 
 import me.foesio.core.dialog.DialogButton;
+import me.foesio.core.dialog.DialogIcons;
 import me.foesio.core.dialog.NativeDialogSupport;
 import me.foesio.core.dialog.TextDialogRequest;
 import me.foesio.core.editor.EditorDialogInputs;
+import me.foesio.core.editor.EditorItemFactory;
 import me.foesio.core.gui.GuiButtonConfig;
+import me.foesio.core.gui.GuiItemConfig;
+import me.foesio.core.gui.GuiItems;
+import me.foesio.core.gui.GuiTitles;
 import me.foesio.core.gui.EntryBrowserClick;
 import me.foesio.core.gui.EntryBrowserHolder;
 import me.foesio.core.gui.EntryBrowserMenus;
 import me.foesio.core.gui.EntryBrowserRequest;
 import me.foesio.core.material.MaterialTypes;
 import me.foesio.core.message.FoMessageService;
+import me.foesio.core.message.FoStyle;
 import me.foesio.core.number.DurationParser;
 import me.foesio.core.number.LargeNumberParser;
 import me.foesio.core.sound.FoEditorSounds;
@@ -125,19 +131,15 @@ public final class KillstreakGuiManager implements Listener {
 
     private void openLeaderboardFallback(Player player) {
         int size = guiRows("rows", 3) * 9;
-        Inventory inventory = Bukkit.createInventory(null, size, FoText.color(guiConfig.getString("title", "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ")));
-        fill(inventory, guiMaterial("filler-material", Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+        Inventory inventory = Bukkit.createInventory(null, size,
+                GuiTitles.format(guiConfig.getString("title", "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ")));
+        fill(player, inventory, guiMaterial("filler.material",
+                guiMaterial("filler-material", Material.LIGHT_GRAY_STAINED_GLASS_PANE)));
 
-        inventory.setItem(guiSlot("current.slot", 11, size), item(
-                guiMaterial("current.material", Material.DIAMOND_SWORD),
-                messages.renderTemplate(guiConfig.getString("current.name", "{theme}ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"), Map.of()),
-                leaderboardLore(player.getUniqueId(), LeaderboardType.CURRENT)
-        ));
-        inventory.setItem(guiSlot("best.slot", 15, size), item(
-                guiMaterial("best.material", Material.NETHER_STAR),
-                messages.renderTemplate(guiConfig.getString("best.name", "{theme}ʙᴇꜱᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"), Map.of()),
-                leaderboardLore(player.getUniqueId(), LeaderboardType.BEST)
-        ));
+        inventory.setItem(guiSlot("current.slot", 11, size), configuredLeaderboardItem(player, "current",
+                Material.DIAMOND_SWORD, "{theme}ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ", leaderboardLore(player, LeaderboardType.CURRENT)));
+        inventory.setItem(guiSlot("best.slot", 15, size), configuredLeaderboardItem(player, "best",
+                Material.NETHER_STAR, "{theme}ʙᴇsᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ", leaderboardLore(player, LeaderboardType.BEST)));
 
         player.openInventory(inventory);
     }
@@ -155,7 +157,7 @@ public final class KillstreakGuiManager implements Listener {
             RewardCommand reward = rewards.get(index);
             entries.add(EntryBrowserRequest.Entry.of(
                     rewardBrowserId(reward),
-                    rewardBrowserItem(reward, index + 1)
+                    rewardBrowserItem(player, reward, index + 1)
             ));
         }
 
@@ -172,10 +174,10 @@ public final class KillstreakGuiManager implements Listener {
                 .filter(normalizedSearch)
                 .buttons(BUTTONS)
                 .showBack(true)
-                .addButton(item(
-                        Material.ANVIL,
+                .addButton(button(player, FoStyle.GOOD, Material.ANVIL,
                         message("gui.rewards.add-name"),
-                        messageList("gui.rewards.add-lore", Map.of())
+                        messageList("gui.rewards.add-lore", Map.of()),
+                        "add a reward"
                 ))
                 .build());
     }
@@ -192,17 +194,17 @@ public final class KillstreakGuiManager implements Listener {
         Inventory inventory = Bukkit.createInventory(null, REWARD_EDITOR_SIZE, message("gui.reward-sender.title"));
         fill(inventory, ADMIN_FILLER);
 
-        inventory.setItem(11, item(
-                Material.COMMAND_BLOCK,
+        inventory.setItem(11, button(player, FoStyle.THEME, Material.COMMAND_BLOCK,
                 message("gui.reward-sender.console-name"),
-                messageList("gui.reward-sender.console-lore", Map.of("streak", String.valueOf(streak)))
+                messageList("gui.reward-sender.console-lore", Map.of("streak", String.valueOf(streak))),
+                "use console rewards"
         ));
-        inventory.setItem(15, item(
-                Material.PLAYER_HEAD,
+        inventory.setItem(15, button(player, FoStyle.THEME, Material.PLAYER_HEAD,
                 message("gui.reward-sender.player-name"),
-                messageList("gui.reward-sender.player-lore", Map.of("streak", String.valueOf(streak)))
+                messageList("gui.reward-sender.player-lore", Map.of("streak", String.valueOf(streak))),
+                "use player rewards"
         ));
-        inventory.setItem(REWARD_EDITOR_BACK_SLOT, BUTTONS.back());
+        inventory.setItem(REWARD_EDITOR_BACK_SLOT, BUTTONS.back(player));
 
         player.openInventory(inventory);
     }
@@ -220,7 +222,7 @@ public final class KillstreakGuiManager implements Listener {
         RewardCommand reward = findReward(streak, configKey, index);
         if (reward == null) {
             editorSounds.error(player);
-            player.sendMessage(message("editor.reward-missing"));
+            send(player, "editor.reward-missing");
             openRewardBrowser(player);
             return;
         }
@@ -229,31 +231,31 @@ public final class KillstreakGuiManager implements Listener {
         Inventory inventory = Bukkit.createInventory(null, REWARD_EDITOR_SIZE, message("gui.reward-edit.title"));
         fill(inventory, ADMIN_FILLER);
 
-        inventory.setItem(10, item(
-                Material.NETHER_STAR,
+        inventory.setItem(10, button(player, FoStyle.THEME, Material.NETHER_STAR,
                 message("gui.reward-edit.streak-name"),
-                messageList("gui.reward-edit.streak-lore", Map.of("streak", String.valueOf(reward.streak())))
+                messageList("gui.reward-edit.streak-lore", Map.of("streak", String.valueOf(reward.streak()))),
+                "view the streak"
         ));
-        inventory.setItem(12, item(
-                Material.REPEATER,
+        inventory.setItem(12, button(player, FoStyle.THEME, Material.REPEATER,
                 message("gui.reward-edit.sender-name"),
                 messageList("gui.reward-edit.sender-lore", Map.of(
                         "sender", reward.sender().name().toLowerCase(Locale.ROOT),
                         "console", senderOption(reward.sender(), RewardSender.CONSOLE),
                         "player", senderOption(reward.sender(), RewardSender.PLAYER)
-                ))
+                )),
+                "change the sender"
         ));
-        inventory.setItem(14, item(
-                Material.COMMAND_BLOCK,
+        inventory.setItem(14, button(player, FoStyle.THEME, Material.COMMAND_BLOCK,
                 message("gui.reward-edit.command-name"),
-                messageList("gui.reward-edit.command-lore", Map.of("command", reward.command()))
+                messageList("gui.reward-edit.command-lore", Map.of("command", reward.command())),
+                "edit the command"
         ));
-        inventory.setItem(16, item(
-                Material.LAVA_BUCKET,
+        inventory.setItem(16, button(player, FoStyle.BAD, Material.LAVA_BUCKET,
                 message("gui.reward-edit.delete-name"),
-                messageList("gui.reward-edit.delete-lore", Map.of())
+                messageList("gui.reward-edit.delete-lore", Map.of()),
+                "delete the reward"
         ));
-        inventory.setItem(REWARD_EDITOR_BACK_SLOT, BUTTONS.back());
+        inventory.setItem(REWARD_EDITOR_BACK_SLOT, BUTTONS.back(player));
 
         player.openInventory(inventory);
     }
@@ -262,7 +264,7 @@ public final class KillstreakGuiManager implements Listener {
         RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
         if (reward == null) {
             editorSounds.error(player);
-            player.sendMessage(message("editor.reward-missing"));
+            send(player, "editor.reward-missing");
             openRewardBrowser(player);
             return;
         }
@@ -272,18 +274,18 @@ public final class KillstreakGuiManager implements Listener {
         Inventory inventory = Bukkit.createInventory(null, REWARD_EDITOR_SIZE, message("gui.reward-delete.title"));
         fill(inventory, ADMIN_FILLER);
 
-        inventory.setItem(11, item(
-                Material.LIME_WOOL,
+        inventory.setItem(11, button(player, FoStyle.GOOD, Material.LIME_WOOL,
                 message("gui.reward-delete.confirm-name"),
                 messageList("gui.reward-delete.confirm-lore", Map.of(
                         "streak", String.valueOf(reward.streak()),
                         "command", reward.command()
-                ))
+                )),
+                "confirm deletion"
         ));
-        inventory.setItem(15, item(
-                Material.RED_WOOL,
+        inventory.setItem(15, button(player, FoStyle.BAD, Material.RED_WOOL,
                 message("gui.reward-delete.cancel-name"),
-                messageList("gui.reward-delete.cancel-lore", Map.of())
+                messageList("gui.reward-delete.cancel-lore", Map.of()),
+                "cancel deletion"
         ));
 
         player.openInventory(inventory);
@@ -307,46 +309,49 @@ public final class KillstreakGuiManager implements Listener {
         String broadcastsNamePath = broadcasts ? "gui.admin.broadcasts-enabled-name" : "gui.admin.broadcasts-disabled-name";
         String cooldownNamePath = cooldown ? "gui.admin.cooldown-enabled-name" : "gui.admin.cooldown-disabled-name";
 
-        inventory.setItem(SLOT_PLAYER_DEATH_RESET, item(
+        inventory.setItem(SLOT_PLAYER_DEATH_RESET, button(player, playerDeathOnly ? FoStyle.GOOD : FoStyle.BAD,
                 playerDeathOnly ? Material.LIME_DYE : Material.RED_DYE,
                 message(playerDeathNamePath),
-                messageList("gui.admin.player-death-reset-lore", Map.of("state", state(playerDeathOnly)))
+                messageList("gui.admin.player-death-reset-lore", Map.of("state", state(playerDeathOnly))),
+                "toggle death reset"
         ));
-        inventory.setItem(SLOT_BROADCASTS, item(
+        inventory.setItem(SLOT_BROADCASTS, button(player, broadcasts ? FoStyle.GOOD : FoStyle.BAD,
                 broadcasts ? Material.LIME_DYE : Material.RED_DYE,
                 message(broadcastsNamePath),
-                messageList("gui.admin.broadcasts-lore", Map.of("state", state(broadcasts)))
+                messageList("gui.admin.broadcasts-lore", Map.of("state", state(broadcasts))),
+                "toggle broadcasts"
         ));
-        inventory.setItem(SLOT_COOLDOWN_TOGGLE, item(
+        inventory.setItem(SLOT_COOLDOWN_TOGGLE, button(player, cooldown ? FoStyle.GOOD : FoStyle.BAD,
                 cooldown ? Material.LIME_DYE : Material.RED_DYE,
                 message(cooldownNamePath),
-                messageList("gui.admin.cooldown-lore", Map.of("state", state(cooldown)))
+                messageList("gui.admin.cooldown-lore", Map.of("state", state(cooldown))),
+                "toggle cooldown"
         ));
-        inventory.setItem(SLOT_COOLDOWN_SECONDS, item(
-                Material.CLOCK,
+        inventory.setItem(SLOT_COOLDOWN_SECONDS, button(player, FoStyle.THEME, Material.CLOCK,
                 message("gui.admin.cooldown-seconds-name"),
                 messageList("gui.admin.cooldown-seconds-lore", Map.of(
                         "seconds", String.valueOf(config.getInt("same-victim-cooldown.seconds", 60))
-                ))
+                )),
+                "edit cooldown seconds"
         ));
-        inventory.setItem(SLOT_MILESTONES, item(
-                Material.PAPER,
+        inventory.setItem(SLOT_MILESTONES, button(player, FoStyle.THEME, Material.PAPER,
                 message("gui.admin.milestones-name"),
                 messageList("gui.admin.milestones-lore", Map.of(
                         "milestones", config.getMilestones().stream().map(String::valueOf).collect(Collectors.joining(", "))
-                ))
+                )),
+                "edit milestones"
         ));
-        inventory.setItem(SLOT_REWARDS, item(
-                Material.CHEST,
+        inventory.setItem(SLOT_REWARDS, button(player, FoStyle.THEME, Material.CHEST,
                 message("gui.admin.rewards-name"),
                 messageList("gui.admin.rewards-lore", Map.of(
                         "count", String.valueOf(rewardCount())
-                ))
+                )),
+                "manage rewards"
         ));
-        inventory.setItem(SLOT_RELOAD, item(
-                Material.EMERALD,
+        inventory.setItem(SLOT_RELOAD, button(player, FoStyle.THEME, Material.EMERALD,
                 message("gui.admin.reload-name"),
-                messageList("gui.admin.reload-lore", Map.of())
+                messageList("gui.admin.reload-lore", Map.of()),
+                "reload the plugin"
         ));
 
         player.openInventory(inventory);
@@ -367,7 +372,7 @@ public final class KillstreakGuiManager implements Listener {
         if (isAdminEditorTitle(title) && !player.hasPermission("fokillstreak.admin")) {
             event.setCancelled(true);
             player.closeInventory();
-            player.sendMessage(message("commands.no-permission"));
+            send(player, "commands.no-permission");
             return;
         }
 
@@ -448,10 +453,10 @@ public final class KillstreakGuiManager implements Listener {
         } else if (rawSlot == SLOT_RELOAD) {
             if (plugin.reloadPluginFiles()) {
                 plugin.adminSounds().reload(player);
-                player.sendMessage(message("commands.reloaded"));
+                send(player, "commands.reloaded");
             } else {
                 plugin.adminSounds().reloadError(player);
-                player.sendMessage(message("commands.reload-failed"));
+                send(player, "commands.reload-failed");
             }
             openAdminEditor(player, false);
         }
@@ -466,7 +471,7 @@ public final class KillstreakGuiManager implements Listener {
                 RewardCommand reward = findRewardByBrowserId(click.entryId());
                 if (reward == null) {
                     editorSounds.error(player);
-                    player.sendMessage(message("editor.reward-missing"));
+                    send(player, "editor.reward-missing");
                     openRewardBrowser(player, page, search);
                 } else {
                     enterRewardEdit(player, reward);
@@ -486,7 +491,7 @@ public final class KillstreakGuiManager implements Listener {
             }
             case CLEAR_SEARCH -> {
                 editorSounds.clearSearch(player);
-                player.sendMessage(message("editor.search-cleared"));
+                send(player, "editor.search-cleared");
                 openRewardBrowser(player, 0, "");
             }
             case PREVIOUS_PAGE -> {
@@ -541,7 +546,7 @@ public final class KillstreakGuiManager implements Listener {
         RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
         if (reward == null) {
             editorSounds.error(player);
-            player.sendMessage(message("editor.reward-missing"));
+            send(player, "editor.reward-missing");
             openRewardBrowser(player);
             return;
         }
@@ -550,10 +555,10 @@ public final class KillstreakGuiManager implements Listener {
             RewardSender next = reward.sender() == RewardSender.CONSOLE ? RewardSender.PLAYER : RewardSender.CONSOLE;
             if (config.updateRewardSender(reward.configKey(), reward.index(), next)) {
                 editorSounds.cycle(player);
-                player.sendMessage(message("editor.saved", Map.of("setting", "reward sender")));
+                send(player, "editor.saved", Map.of("setting", "reward sender"));
             } else {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.save-failed", Map.of("setting", "reward sender")));
+                send(player, "editor.save-failed", Map.of("setting", "reward sender"));
             }
             openRewardEdit(player, reward.streak(), reward.configKey(), reward.index());
         } else if (rawSlot == 14) {
@@ -581,13 +586,13 @@ public final class KillstreakGuiManager implements Listener {
             RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
             if (reward == null) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.reward-missing"));
+                send(player, "editor.reward-missing");
             } else if (config.removeReward(reward.configKey(), reward.index())) {
                 editorSounds.delete(player);
-                player.sendMessage(message("editor.reward-deleted", Map.of("streak", String.valueOf(state.streak()))));
+                send(player, "editor.reward-deleted", Map.of("streak", String.valueOf(state.streak())));
             } else {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.save-failed", Map.of("setting", "reward")));
+                send(player, "editor.save-failed", Map.of("setting", "reward"));
             }
             rewardDeleteStates.remove(player.getUniqueId());
             rewardEditStates.remove(player.getUniqueId());
@@ -603,10 +608,10 @@ public final class KillstreakGuiManager implements Listener {
         boolean newValue = !config.getBoolean(path, true);
         if (config.setAndSave(path, newValue)) {
             editorSounds.toggle(player, newValue);
-            player.sendMessage(message("editor.saved", Map.of("setting", settingName)));
+            send(player, "editor.saved", Map.of("setting", settingName));
         } else {
             editorSounds.error(player);
-            player.sendMessage(message("editor.save-failed", Map.of("setting", settingName)));
+            send(player, "editor.save-failed", Map.of("setting", settingName));
         }
         openAdminEditor(player, false);
     }
@@ -631,7 +636,7 @@ public final class KillstreakGuiManager implements Listener {
             var duration = DurationParser.parse(input);
             if (duration.isEmpty()) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.invalid-number"));
+                send(player, "editor.invalid-number");
                 openAdminEditor(player, false);
                 return;
             }
@@ -639,7 +644,7 @@ public final class KillstreakGuiManager implements Listener {
             long parsedSeconds = duration.get().secondsFloor();
             if (parsedSeconds <= 0 || parsedSeconds > Integer.MAX_VALUE) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.invalid-number"));
+                send(player, "editor.invalid-number");
                 openAdminEditor(player, false);
                 return;
             }
@@ -647,10 +652,10 @@ public final class KillstreakGuiManager implements Listener {
 
             if (config.setAndSave("same-victim-cooldown.seconds", seconds)) {
                 editorSounds.save(player);
-                player.sendMessage(message("editor.saved", Map.of("setting", "cooldown seconds")));
+                send(player, "editor.saved", Map.of("setting", "cooldown seconds"));
             } else {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.save-failed", Map.of("setting", "cooldown seconds")));
+                send(player, "editor.save-failed", Map.of("setting", "cooldown seconds"));
             }
             openAdminEditor(player, false);
         }, () -> openAdminEditor(player, false));
@@ -676,17 +681,17 @@ public final class KillstreakGuiManager implements Listener {
             List<Integer> milestones = parseMilestones(input);
             if (milestones.isEmpty()) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.invalid-list"));
+                send(player, "editor.invalid-list");
                 openAdminEditor(player, false);
                 return;
             }
 
             if (config.setAndSave("broadcasts.milestones", milestones)) {
                 editorSounds.save(player);
-                player.sendMessage(message("editor.saved", Map.of("setting", "milestones")));
+                send(player, "editor.saved", Map.of("setting", "milestones"));
             } else {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.save-failed", Map.of("setting", "milestones")));
+                send(player, "editor.save-failed", Map.of("setting", "milestones"));
             }
             openAdminEditor(player, false);
         }, () -> openAdminEditor(player, false));
@@ -715,7 +720,7 @@ public final class KillstreakGuiManager implements Listener {
                 true,
                 false
         ), input -> {
-            player.sendMessage(message("editor.search-applied", Map.of("search", input)));
+            send(player, "editor.search-applied", Map.of("search", input));
             openRewardBrowser(player, 0, input);
         }, () -> openRewardBrowser(player, state.page(), state.search()));
     }
@@ -739,7 +744,7 @@ public final class KillstreakGuiManager implements Listener {
             int streak = parsePositiveInt(input);
             if (streak <= 0) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.invalid-reward-streak"));
+                send(player, "editor.invalid-reward-streak");
                 openRewardBrowser(player);
                 return;
             }
@@ -753,7 +758,7 @@ public final class KillstreakGuiManager implements Listener {
             String command = normalizeCommand(input);
             if (command.isBlank()) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.invalid-reward-command"));
+                send(player, "editor.invalid-reward-command");
                 openRewardSenderSelector(player, streak);
                 return;
             }
@@ -761,11 +766,11 @@ public final class KillstreakGuiManager implements Listener {
             if (config.addReward(streak, sender, command)) {
                 pendingRewardStates.remove(player.getUniqueId());
                 editorSounds.save(player);
-                player.sendMessage(message("editor.reward-added", Map.of("streak", String.valueOf(streak))));
+                send(player, "editor.reward-added", Map.of("streak", String.valueOf(streak)));
                 openRewardBrowser(player, 0, "");
             } else {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.save-failed", Map.of("setting", "reward")));
+                send(player, "editor.save-failed", Map.of("setting", "reward"));
                 openRewardBrowser(player);
             }
         }, () -> openRewardSenderSelector(player, streak));
@@ -775,7 +780,7 @@ public final class KillstreakGuiManager implements Listener {
         RewardCommand reward = findReward(state.streak(), state.configKey(), state.index());
         if (reward == null) {
             editorSounds.error(player);
-            player.sendMessage(message("editor.reward-missing"));
+            send(player, "editor.reward-missing");
             openRewardBrowser(player);
             return;
         }
@@ -785,17 +790,17 @@ public final class KillstreakGuiManager implements Listener {
             String command = normalizeCommand(input);
             if (command.isBlank()) {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.invalid-reward-command"));
+                send(player, "editor.invalid-reward-command");
                 openRewardEdit(player, state.streak(), state.configKey(), state.index());
                 return;
             }
 
             if (config.updateRewardCommand(state.configKey(), state.index(), command)) {
                 editorSounds.save(player);
-                player.sendMessage(message("editor.saved", Map.of("setting", "reward command")));
+                send(player, "editor.saved", Map.of("setting", "reward command"));
             } else {
                 editorSounds.error(player);
-                player.sendMessage(message("editor.save-failed", Map.of("setting", "reward command")));
+                send(player, "editor.save-failed", Map.of("setting", "reward command"));
             }
             openRewardEdit(player, state.streak(), state.configKey(), state.index());
         }, () -> openRewardEdit(player, state.streak(), state.configKey(), state.index()));
@@ -831,19 +836,20 @@ public final class KillstreakGuiManager implements Listener {
         );
     }
 
-    private List<String> leaderboardLore(UUID uuid, LeaderboardType type) {
+    private List<String> leaderboardLore(Player player, LeaderboardType type) {
+        UUID uuid = player.getUniqueId();
         List<LeaderboardEntry> top = storage.top(type, 10);
         List<String> lore = new ArrayList<>();
         for (int rank = 1; rank <= 10; rank++) {
             if (top.size() >= rank) {
                 LeaderboardEntry entry = top.get(rank - 1);
-                lore.add(messages.renderTemplate(guiConfig.getString("lines.entry", "{theme}#{rank} {white}{player} {muted}- {theme}{streak}"), Map.of(
+                lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.entry", "{theme}#{rank} {white}{player} {muted}- {theme}{streak}"), Map.of(
                         "rank", String.valueOf(entry.rank()),
                         "player", entry.name(),
                         "streak", String.valueOf(entry.streak())
                 )));
             } else {
-                lore.add(messages.renderTemplate(guiConfig.getString("lines.empty", "{muted}#{rank} Empty"), Map.of("rank", String.valueOf(rank))));
+                lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.empty", "{muted}#{rank} Empty"), Map.of("rank", String.valueOf(rank))));
             }
         }
 
@@ -851,12 +857,12 @@ public final class KillstreakGuiManager implements Listener {
         int rank = storage.rank(uuid, type);
         int streak = type == LeaderboardType.CURRENT ? storage.currentStreak(uuid) : storage.bestStreak(uuid);
         if (rank > 0) {
-            lore.add(messages.renderTemplate(guiConfig.getString("lines.position", "{white}Your position: {theme}#{rank} {muted}({streak})"), Map.of(
+            lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.position", "{white}Your position: {theme}#{rank} {muted}({streak})"), Map.of(
                     "rank", String.valueOf(rank),
                     "streak", String.valueOf(streak)
             )));
         } else {
-            lore.add(messages.renderTemplate(guiConfig.getString("lines.unranked", "{white}Your position: {muted}Unranked"), Map.of()));
+            lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.unranked", "{white}Your position: {muted}Unranked"), Map.of()));
         }
         return lore;
     }
@@ -889,16 +895,16 @@ public final class KillstreakGuiManager implements Listener {
         return filtered;
     }
 
-    private ItemStack rewardBrowserItem(RewardCommand reward, int displayIndex) {
-        return item(
-                Material.COMMAND_BLOCK,
+    private ItemStack rewardBrowserItem(Player player, RewardCommand reward, int displayIndex) {
+        return button(player, FoStyle.THEME, Material.COMMAND_BLOCK,
                 message("gui.rewards.reward-name", Map.of("streak", String.valueOf(reward.streak()))),
                 messageList("gui.rewards.reward-lore", Map.of(
                         "index", String.valueOf(displayIndex),
                         "streak", String.valueOf(reward.streak()),
                         "sender", reward.sender().name().toLowerCase(Locale.ROOT),
                         "command", reward.command()
-                ))
+                )),
+                "edit the reward"
         );
     }
 
@@ -978,6 +984,14 @@ public final class KillstreakGuiManager implements Listener {
         return messages.render(path, MessageFallbacks.string(path));
     }
 
+    private void send(Player player, String path) {
+        messages.send(player, path, MessageFallbacks.string(path));
+    }
+
+    private void send(Player player, String path, Map<String, String> placeholders) {
+        messages.send(player, path, MessageFallbacks.string(path), placeholders);
+    }
+
     private String message(String path, Map<String, String> placeholders) {
         return messages.render(path, MessageFallbacks.string(path), placeholders);
     }
@@ -1012,10 +1026,46 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     private void fill(Inventory inventory, Material material) {
-        ItemStack filler = item(material, " ", List.of());
+        fill(null, inventory, material);
+    }
+
+    private void fill(Player viewer, Inventory inventory, Material material) {
+        String name = guiConfig.getString("filler.name", " ");
+        List<String> lore = guiConfig.getStringList("filler.lore");
+        Integer customModelData = GuiItemConfig.parseCustomModelData(guiConfig.get("filler.custom-model-data"), null);
+        String renderedName = viewer == null ? messages.renderTemplate(name, Map.of())
+                : messages.renderTemplateForViewer(viewer, name, Map.of());
+        List<String> renderedLore = lore.stream()
+                .map(line -> viewer == null ? messages.renderTemplate(line, Map.of())
+                        : messages.renderTemplateForViewer(viewer, line, Map.of()))
+                .toList();
+        ItemStack filler = GuiItems.create(viewer, material, renderedName, renderedLore, false, 1, customModelData);
         for (int slot = 0; slot < inventory.getSize(); slot++) {
-            inventory.setItem(slot, filler);
+            inventory.setItem(slot, filler.clone());
         }
+    }
+
+    private ItemStack configuredLeaderboardItem(Player player, String path, Material fallbackMaterial,
+            String fallbackName, List<String> fallbackLore) {
+        Material material = guiMaterial(path + ".material", fallbackMaterial);
+        String name = guiConfig.getString(path + ".name", fallbackName);
+        List<String> lore = guiConfig.getStringList(path + ".lore");
+        if (lore.isEmpty()) {
+            lore = fallbackLore;
+        }
+        Integer customModelData = GuiItemConfig.parseCustomModelData(guiConfig.get(path + ".custom-model-data"), null);
+        return GuiItems.create(player, material,
+                messages.renderTemplateForViewer(player, name, Map.of()),
+                lore.stream().map(line -> messages.renderTemplateForViewer(player, line, Map.of())).toList(),
+                false, 1, customModelData);
+    }
+
+    private ItemStack displayItem(Player player, Material material, String name, List<String> lore) {
+        return EditorItemFactory.item(player, material, name, lore);
+    }
+
+    private ItemStack button(Player player, String color, Material material, String name, List<String> lore, String action) {
+        return EditorItemFactory.button(player, material, color, FoText.plain(name), lore, action);
     }
 
     private ItemStack item(Material material, String name, List<String> lore) {

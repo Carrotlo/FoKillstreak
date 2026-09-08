@@ -10,7 +10,6 @@ import me.foesio.core.dialog.NativeDialogSupport;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.text.FoText;
 import me.foesio.foKillstreak.FoKillstreak;
-import me.foesio.foKillstreak.compat.BedrockPlayerDetector;
 import me.foesio.foKillstreak.config.GuiConfigService;
 import me.foesio.foKillstreak.data.LeaderboardEntry;
 import me.foesio.foKillstreak.data.LeaderboardType;
@@ -54,7 +53,7 @@ public final class PaperDialogLeaderboardService implements LeaderboardDialogSer
 
     @Override
     public boolean open(Player player, LeaderboardType type) {
-        if (!nativeDialogs.canUseNativeDialogs() || BedrockPlayerDetector.isBedrock(player)) {
+        if (!nativeDialogs.canUseNativeDialogs(player)) {
             return false;
         }
 

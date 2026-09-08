@@ -1,9 +1,11 @@
+# Edit optional item icons here. Remove any :icon: token to hide it.
+# Unsupported servers, older Java clients, and Bedrock players automatically receive clean text without item sprites.
 # FoKillstreak messages and GUI text.
 # Editable message tokens: {prefix}, {theme}, {muted}, {white}, {good}, {bad}
 # Common runtime tokens: {player}, {victim}, {streak}, {best_streak}, {milestone}, {version}, {author}, {cooldown}, {sender}, {command}, {index}
 
 tokens:
-  prefix: "{theme}FoKillstreak &8» {muted}"
+  prefix: ":diamond_sword: {theme}FoKillstreak &8» {muted}"
   theme: "#03fc88"
   muted: "#a7b8b0"
   white: "#ffffff"
@@ -13,31 +15,31 @@ tokens:
 commands:
   no-permission: "{prefix}{bad}No permission{muted}."
   only-player: "{prefix}{bad}Player only{muted}."
-  usage-admin: "{prefix}Use {theme}/fokillstreakadmin <version|reload|editor|set>{muted}."
+  usage-admin: "{prefix}:paper: Use {theme}/fokillstreakadmin <version|reload|editor|set>{muted}."
   usage-set: "{prefix}Use {theme}/fokillstreakadmin set <player> <streak> <best|current>{muted}."
-  reloaded: "{prefix}{good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, and {theme}guis/{muted}."
-  reload-failed: "{prefix}{bad}Reload failed{muted}. Check console."
-  player-not-found: "{prefix}{bad}Player not found{muted}. They must be online or known to the server."
+  reloaded: "{prefix}:emerald: {good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, and {theme}guis/{muted}."
+  reload-failed: "{prefix}:redstone: {bad}Reload failed{muted}. Check console."
+  player-not-found: "{prefix}:player_head: {bad}Player not found{muted}. They must be online or known to the server."
   invalid-streak: "{prefix}{bad}Invalid streak{muted}. Use a whole number of {theme}0{muted} or higher."
   invalid-streak-type: "{prefix}{bad}Invalid type{muted}. Use {theme}best{muted} or {theme}current{muted}."
-  streak-set: "{prefix}{good}Set {theme}{player}{muted}'s {theme}{type}{muted} streak to {theme}{streak}{muted}."
+  streak-set: "{prefix}:emerald: {good}Set {theme}{player}{muted}'s {theme}{type}{muted} streak to {theme}{streak}{muted}."
 
 killstreak:
-  cooldown-blocked: "{prefix}{bad}No streak gained{muted}. Wait {theme}{cooldown}s{muted} before killing {theme}{victim}{muted} again."
+  cooldown-blocked: "{prefix}:clock: {bad}No streak gained{muted}. Wait {theme}{cooldown}s{muted} before killing {theme}{victim}{muted} again."
 
 broadcasts:
-  milestone: "{prefix}{theme}{player}{muted} reached a {theme}{streak}{muted} killstreak."
+  milestone: "{prefix}:fire_charge: {theme}{player}{muted} reached a {theme}{streak}{muted} killstreak."
 
 editor:
-  saved: "{prefix}{good}Saved {theme}{setting}{muted}."
-  save-failed: "{prefix}{bad}Could not save {theme}{setting}{muted}. Check console."
+  saved: "{prefix}:emerald: {good}Saved {theme}{setting}{muted}."
+  save-failed: "{prefix}:redstone: {bad}Could not save {theme}{setting}{muted}. Check console."
   cancelled: "{prefix}{bad}Cancelled{muted}."
   invalid-number: "{prefix}{bad}Invalid number{muted}. Use a whole number above zero."
   invalid-list: "{prefix}{bad}Invalid list{muted}. Use comma-separated whole numbers, like {theme}5,10,15{muted}."
   invalid-reward-streak: "{prefix}{bad}Invalid reward streak{muted}. Use a whole number above {theme}0{muted}."
   invalid-reward-command: "{prefix}{bad}Invalid reward command{muted}. Type a command without a leading slash."
-  reward-added: "{prefix}{good}Added reward for {theme}{streak}{muted} kills."
-  reward-deleted: "{prefix}{good}Deleted reward for {theme}{streak}{muted} kills."
+  reward-added: "{prefix}:emerald: {good}Added reward for {theme}{streak}{muted} kills."
+  reward-deleted: "{prefix}:lava_bucket: {good}Deleted reward for {theme}{streak}{muted} kills."
   reward-missing: "{prefix}{bad}Reward missing{muted}. It may have been edited already."
   search-applied: "{prefix}{good}Search applied{muted}: {theme}{search}"
   search-cleared: "{prefix}{good}Search cleared{muted}."

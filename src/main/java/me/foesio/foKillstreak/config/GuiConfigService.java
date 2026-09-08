@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public final class GuiConfigService {
     private static final String LEADERBOARD_PATH = "guis/leaderboard.yml";
@@ -39,6 +40,14 @@ public final class GuiConfigService {
 
     public int getInt(String path, int fallback) {
         return leaderboard.getInt(path, fallback);
+    }
+
+    public Object get(String path) {
+        return leaderboard.get(path);
+    }
+
+    public List<String> getStringList(String path) {
+        return leaderboard.getStringList(path);
     }
 
     private boolean backfillMissingDefaults() {

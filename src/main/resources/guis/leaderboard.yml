@@ -6,14 +6,22 @@ title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ"
 rows: 3
 filler-material: LIGHT_GRAY_STAINED_GLASS_PANE
 
+filler:
+  material: LIGHT_GRAY_STAINED_GLASS_PANE
+  custom-model-data: ''
+  name: ' '
+  lore: []
+
 current:
   slot: 11
   material: DIAMOND_SWORD
+  custom-model-data: ''
   name: "{theme}ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
 
 best:
   slot: 15
   material: NETHER_STAR
+  custom-model-data: ''
   name: "{theme}ʙᴇꜱᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
 
 lines:

@@ -26,6 +26,7 @@ import me.foesio.foKillstreak.listener.KillstreakListener;
 import me.foesio.foKillstreak.message.MessageFallbacks;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.UUID;
@@ -56,6 +57,7 @@ public final class FoKillstreak extends JavaPlugin {
         guiConfigService.load();
         refreshCoreContext();
         messageService = FoMessageService.load(this, messageMigrations());
+        migrateSprites();
         updateNotices = core.createUpdateNotices(messageService, MODRINTH_PROJECT_ID, adminSounds).start();
 
         streakStorage = new StreakStorage(this);
@@ -157,6 +159,26 @@ public final class FoKillstreak extends JavaPlugin {
                 .build();
     }
 
+    private void migrateSprites() {
+        messageService.migrateToVersion(core.migrations(), 1, config -> {
+            boolean changed = false;
+            changed |= FoMessageService.addMissingToken(config, "tokens.prefix", ":diamond_sword:", null);
+            changed |= FoMessageService.addMissingToken(config, "commands.usage-admin", ":paper:");
+            changed |= FoMessageService.addMissingToken(config, "commands.reloaded", ":emerald:");
+            changed |= FoMessageService.addMissingToken(config, "commands.reload-failed", ":redstone:");
+            changed |= FoMessageService.addMissingToken(config, "commands.player-not-found", ":player_head:");
+            changed |= FoMessageService.addMissingToken(config, "commands.streak-set", ":emerald:");
+            changed |= FoMessageService.addMissingToken(config, "killstreak.cooldown-blocked", ":clock:");
+            changed |= FoMessageService.addMissingToken(config, "broadcasts.milestone", ":fire_charge:");
+            changed |= FoMessageService.addMissingToken(config, "editor.saved", ":emerald:");
+            changed |= FoMessageService.addMissingToken(config, "editor.save-failed", ":redstone:");
+            changed |= FoMessageService.addMissingToken(config, "editor.reward-added", ":emerald:");
+            changed |= FoMessageService.addMissingToken(config, "editor.reward-deleted", ":lava_bucket:");
+            return changed;
+        });
+        messageService.reload();
+    }
+
     private void registerCommands() {
         FoAdminCommand.builder(this, messageService)
                 .commandName("fokillstreakadmin")
@@ -193,7 +215,7 @@ public final class FoKillstreak extends JavaPlugin {
                 messageService.send(context.sender(), "commands.usage-admin", MessageFallbacks.string("commands.usage-admin"));
                 return true;
             }
-            updateNotices.sendVersion(context.sender());
+            updateNotices.checkAndSendVersion(context.sender());
             return true;
         }).usage("version").build();
     }
