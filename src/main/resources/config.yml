@@ -27,6 +27,9 @@ native-dialogs:
 broadcasts:
   # Broadcast only when the killer reaches one of the exact milestones below.
   enabled: true
+  # Announce when a player ends another player's streak at or above the threshold.
+  announce-ended-streak: false
+  announce-threshold: 5
   milestones:
     - 5
     - 10

@@ -29,6 +29,7 @@ import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -176,7 +177,63 @@ public final class FoKillstreak extends JavaPlugin {
             changed |= FoMessageService.addMissingToken(config, "editor.reward-deleted", ":lava_bucket:");
             return changed;
         });
+        messageService.migrateToVersion(core.migrations(), 2, this::migrateEditorButtonNames);
+        messageService.migrateToVersion(core.migrations(), 3, this::migrateAnnounceThresholdLore);
         messageService.reload();
+    }
+
+    private boolean migrateAnnounceThresholdLore(FileConfiguration config) {
+        List<String> oldLore = List.of(
+                "{white}Click to edit in chat.",
+                "{white}Current: {theme}{threshold} kills"
+        );
+        if (!config.isList("gui.admin.announce-threshold-lore")
+                || !config.getStringList("gui.admin.announce-threshold-lore").equals(oldLore)) {
+            return false;
+        }
+        config.set("gui.admin.announce-threshold-lore", List.of(
+                "{white}Click to edit in chat.",
+                "{white}Sets the ended-streak announcement threshold.",
+                "{white}Current: {theme}{threshold} kills"
+        ));
+        return true;
+    }
+
+    private boolean migrateEditorButtonNames(FileConfiguration config) {
+        boolean changed = false;
+        changed |= replaceExact(config, "gui.admin.player-death-reset-enabled-name", "{good}ᴘᴠᴘ ᴅᴇᴀᴛʜ ʀᴇꜱᴇᴛꜱ", "{good}PLAYER DEATH RESETS");
+        changed |= replaceExact(config, "gui.admin.player-death-reset-disabled-name", "{bad}ᴀʟʟ ᴅᴇᴀᴛʜꜱ ʀᴇꜱᴇᴛ", "{bad}ALL DEATHS RESET");
+        changed |= replaceExact(config, "gui.admin.broadcasts-enabled-name", "{good}ᴍɪʟᴇꜱᴛᴏɴᴇ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ", "{good}MILESTONE BROADCASTS");
+        changed |= replaceExact(config, "gui.admin.broadcasts-disabled-name", "{bad}ᴍɪʟᴇꜱᴛᴏɴᴇ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ", "{bad}MILESTONE BROADCASTS");
+        changed |= replaceExact(config, "gui.admin.ended-streak-enabled-name", "{good}ᴇɴᴅᴇᴅ-ꜱᴛʀᴇᴀᴋ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ", "{good}ENDED-STREAK BROADCASTS");
+        changed |= replaceExact(config, "gui.admin.ended-streak-disabled-name", "{bad}ᴇɴᴅᴇᴅ-ꜱᴛʀᴇᴀᴋ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ", "{bad}ENDED-STREAK BROADCASTS");
+        changed |= replaceExact(config, "gui.admin.announce-threshold-name", "{theme}ᴀɴɴᴏᴜɴᴄᴇ ᴛʜʀᴇꜱʜᴏʟᴅ", "{theme}ANNOUNCE THRESHOLD");
+        changed |= replaceExact(config, "gui.admin.cooldown-enabled-name", "{good}ꜱᴀᴍᴇ-ᴠɪᴄᴛɪᴍ ᴄᴏᴏʟᴅᴏᴡɴ", "{good}SAME-VICTIM COOLDOWN");
+        changed |= replaceExact(config, "gui.admin.cooldown-disabled-name", "{bad}ꜱᴀᴍᴇ-ᴠɪᴄᴛɪᴍ ᴄᴏᴏʟᴅᴏᴡɴ", "{bad}SAME-VICTIM COOLDOWN");
+        changed |= replaceExact(config, "gui.admin.cooldown-seconds-name", "{theme}ᴄᴏᴏʟᴅᴏᴡɴ ꜱᴇᴄᴏɴᴅꜱ", "{theme}COOLDOWN SECONDS");
+        changed |= replaceExact(config, "gui.admin.milestones-name", "{theme}ᴍɪʟᴇꜱᴛᴏɴᴇꜱ", "{theme}MILESTONES");
+        changed |= replaceExact(config, "gui.admin.rewards-name", "{theme}ʀᴇᴡᴀʀᴅꜱ", "{theme}REWARDS");
+        changed |= replaceExact(config, "gui.admin.reload-name", "{theme}ʀᴇʟᴏᴀᴅ ꜰɪʟᴇꜱ", "{theme}RELOAD FILES");
+        changed |= replaceExact(config, "gui.rewards.reward-name", "{theme}{streak} ᴋɪʟʟꜱ", "{theme}{streak} KILLS");
+        changed |= replaceExact(config, "gui.rewards.empty-name", "{bad}ɴᴏ ʀᴇᴡᴀʀᴅꜱ", "{bad}NO REWARDS");
+        changed |= replaceExact(config, "gui.rewards.add-name", "{good}ᴀᴅᴅ ʀᴇᴡᴀʀᴅ", "{good}ADD REWARD");
+        changed |= replaceExact(config, "gui.reward-sender.console-name", "{theme}ᴄᴏɴꜱᴏʟᴇ", "{theme}CONSOLE");
+        changed |= replaceExact(config, "gui.reward-sender.player-name", "{theme}ᴘʟᴀʏᴇʀ", "{theme}PLAYER");
+        changed |= replaceExact(config, "gui.reward-edit.streak-name", "{theme}ᴋɪʟʟꜱᴛʀᴇᴀᴋ", "{theme}KILLSTREAK");
+        changed |= replaceExact(config, "gui.reward-edit.sender-name", "{theme}ꜱᴇɴᴅᴇʀ", "{theme}SENDER");
+        changed |= replaceExact(config, "gui.reward-edit.command-name", "{theme}ᴄᴏᴍᴍᴀɴᴅ", "{theme}COMMAND");
+        changed |= replaceExact(config, "gui.reward-edit.delete-name", "{bad}ᴅᴇʟᴇᴛᴇ", "{bad}DELETE");
+        changed |= replaceExact(config, "gui.reward-delete.confirm-name", "{good}ᴄᴏɴꜰɪʀᴍ", "{good}CONFIRM");
+        changed |= replaceExact(config, "gui.reward-delete.cancel-name", "{bad}ᴄᴀɴᴄᴇʟ", "{bad}CANCEL");
+        return changed;
+    }
+
+    private boolean replaceExact(FileConfiguration config, String path, String oldValue, String newValue) {
+        if (!oldValue.equals(config.getString(path))) {
+            return false;
+        }
+        config.set(path, newValue);
+        return true;
     }
 
     private void registerCommands() {

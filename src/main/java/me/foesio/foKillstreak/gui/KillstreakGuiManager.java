@@ -63,7 +63,7 @@ public final class KillstreakGuiManager implements Listener {
     private static final GuiButtonConfig BUTTONS = GuiButtonConfig.defaults();
     private static final long LEADERBOARD_OPEN_COOLDOWN_MILLIS = 500L;
     private static final long LEADERBOARD_TAB_COOLDOWN_MILLIS = 200L;
-    private static final int ADMIN_SIZE = 27;
+    private static final int ADMIN_SIZE = 36;
     private static final int SLOT_RELOAD = 10;
     private static final int SLOT_REWARDS = 11;
     private static final int SLOT_MILESTONES = 12;
@@ -71,6 +71,8 @@ public final class KillstreakGuiManager implements Listener {
     private static final int SLOT_COOLDOWN_TOGGLE = 14;
     private static final int SLOT_COOLDOWN_SECONDS = 15;
     private static final int SLOT_PLAYER_DEATH_RESET = 16;
+    private static final int SLOT_ENDED_STREAK = 19;
+    private static final int SLOT_ANNOUNCE_THRESHOLD = 20;
     private static final int REWARD_EDITOR_SIZE = 27;
     private static final int REWARD_EDITOR_BACK_SLOT = 22;
 
@@ -304,9 +306,11 @@ public final class KillstreakGuiManager implements Listener {
 
         boolean playerDeathOnly = config.getBoolean("death-reset.only-by-player", true);
         boolean broadcasts = config.getBoolean("broadcasts.enabled", true);
+        boolean endedStreak = config.getBoolean("broadcasts.announce-ended-streak", false);
         boolean cooldown = config.getBoolean("same-victim-cooldown.enabled", true);
         String playerDeathNamePath = playerDeathOnly ? "gui.admin.player-death-reset-enabled-name" : "gui.admin.player-death-reset-disabled-name";
         String broadcastsNamePath = broadcasts ? "gui.admin.broadcasts-enabled-name" : "gui.admin.broadcasts-disabled-name";
+        String endedStreakNamePath = endedStreak ? "gui.admin.ended-streak-enabled-name" : "gui.admin.ended-streak-disabled-name";
         String cooldownNamePath = cooldown ? "gui.admin.cooldown-enabled-name" : "gui.admin.cooldown-disabled-name";
 
         inventory.setItem(SLOT_PLAYER_DEATH_RESET, button(player, playerDeathOnly ? FoStyle.GOOD : FoStyle.BAD,
@@ -320,6 +324,19 @@ public final class KillstreakGuiManager implements Listener {
                 message(broadcastsNamePath),
                 messageList("gui.admin.broadcasts-lore", Map.of("state", state(broadcasts))),
                 "toggle broadcasts"
+        ));
+        inventory.setItem(SLOT_ENDED_STREAK, button(player, endedStreak ? FoStyle.GOOD : FoStyle.BAD,
+                endedStreak ? Material.LIME_DYE : Material.RED_DYE,
+                message(endedStreakNamePath),
+                messageList("gui.admin.ended-streak-lore", Map.of("state", state(endedStreak))),
+                "toggle ended-streak announcements"
+        ));
+        inventory.setItem(SLOT_ANNOUNCE_THRESHOLD, button(player, FoStyle.THEME, Material.LECTERN,
+                message("gui.admin.announce-threshold-name"),
+                messageList("gui.admin.announce-threshold-lore", Map.of(
+                        "threshold", String.valueOf(config.getAnnounceThreshold())
+                )),
+                "edit the announce threshold"
         ));
         inventory.setItem(SLOT_COOLDOWN_TOGGLE, button(player, cooldown ? FoStyle.GOOD : FoStyle.BAD,
                 cooldown ? Material.LIME_DYE : Material.RED_DYE,
@@ -441,6 +458,10 @@ public final class KillstreakGuiManager implements Listener {
             toggle(player, "death-reset.only-by-player", "PvP death resets");
         } else if (rawSlot == SLOT_BROADCASTS) {
             toggle(player, "broadcasts.enabled", "milestone broadcasts");
+        } else if (rawSlot == SLOT_ENDED_STREAK) {
+            toggle(player, "broadcasts.announce-ended-streak", "ended-streak announcements");
+        } else if (rawSlot == SLOT_ANNOUNCE_THRESHOLD) {
+            beginAnnounceThresholdPrompt(player);
         } else if (rawSlot == SLOT_COOLDOWN_TOGGLE) {
             toggle(player, "same-victim-cooldown.enabled", "same-victim cooldown");
         } else if (rawSlot == SLOT_COOLDOWN_SECONDS) {
@@ -692,6 +713,42 @@ public final class KillstreakGuiManager implements Listener {
             } else {
                 editorSounds.error(player);
                 send(player, "editor.save-failed", Map.of("setting", "milestones"));
+            }
+            openAdminEditor(player, false);
+        }, () -> openAdminEditor(player, false));
+    }
+
+    private void beginAnnounceThresholdPrompt(Player player) {
+        editorSounds.open(player);
+        openTextInput(player, new TextDialogRequest(
+                "Announce Threshold",
+                List.of("Use a whole number above zero.", "Streaks at or above this value are announced."),
+                "Threshold",
+                String.valueOf(config.getAnnounceThreshold()),
+                "positive whole number",
+                DialogButton.save(),
+                DialogButton.cancel("Back"),
+                320,
+                300,
+                32,
+                true,
+                true,
+                false
+        ), input -> {
+            int threshold = parsePositiveInt(input);
+            if (threshold <= 0) {
+                editorSounds.error(player);
+                send(player, "editor.invalid-number");
+                openAdminEditor(player, false);
+                return;
+            }
+
+            if (config.setAndSave("broadcasts.announce-threshold", threshold)) {
+                editorSounds.save(player);
+                send(player, "editor.saved", Map.of("setting", "announce threshold"));
+            } else {
+                editorSounds.error(player);
+                send(player, "editor.save-failed", Map.of("setting", "announce threshold"));
             }
             openAdminEditor(player, false);
         }, () -> openAdminEditor(player, false));

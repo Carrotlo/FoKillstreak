@@ -91,6 +91,11 @@ public final class ConfigService {
         return milestones;
     }
 
+    public int getAnnounceThreshold() {
+        int threshold = config.getInt("broadcasts.announce-threshold", 5);
+        return threshold > 0 ? threshold : 5;
+    }
+
     private void reloadMilestoneCache() {
         List<Integer> configured = config.getIntegerList("broadcasts.milestones");
         Set<Integer> unique = new LinkedHashSet<>();

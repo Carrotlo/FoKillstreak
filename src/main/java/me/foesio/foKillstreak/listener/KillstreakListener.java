@@ -45,9 +45,10 @@ public final class KillstreakListener implements Listener {
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player victim = event.getEntity();
         Player killer = victim.getKiller();
+        int victimStreak = storage.currentStreak(victim.getUniqueId());
 
         if (shouldResetVictim(killer, victim)) {
-            boolean lostStreak = storage.currentStreak(victim.getUniqueId()) > 0;
+            boolean lostStreak = victimStreak > 0;
             storage.reset(victim);
             if (lostStreak) {
                 sounds.play(victim, "killstreak.lost");
@@ -56,6 +57,8 @@ public final class KillstreakListener implements Listener {
         if (killer == null || killer.getUniqueId().equals(victim.getUniqueId())) {
             return;
         }
+
+        maybeBroadcastEndedStreak(killer, victim, victimStreak);
 
         long remainingCooldown = remainingCooldownSeconds(killer.getUniqueId(), victim.getUniqueId());
         if (remainingCooldown > 0) {
@@ -143,6 +146,19 @@ public final class KillstreakListener implements Listener {
                 "milestone", String.valueOf(record.currentStreak())
         )));
         sounds.play(killer, "killstreak.milestone");
+    }
+
+    private void maybeBroadcastEndedStreak(Player killer, Player victim, int victimStreak) {
+        if (!config.getBoolean("broadcasts.announce-ended-streak", false)
+                || victimStreak < config.getAnnounceThreshold()) {
+            return;
+        }
+
+        messages.broadcastConfigured("broadcasts.streak-ended", Map.of(
+                "killer", killer.getName(),
+                "victim", victim.getName(),
+                "streak", String.valueOf(victimStreak)
+        ));
     }
 
     private boolean runRewards(Player killer, StreakRecord record) {

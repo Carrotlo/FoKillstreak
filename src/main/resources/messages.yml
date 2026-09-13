@@ -2,7 +2,7 @@
 # Unsupported servers, older Java clients, and Bedrock players automatically receive clean text without item sprites.
 # FoKillstreak messages and GUI text.
 # Editable message tokens: {prefix}, {theme}, {muted}, {white}, {good}, {bad}
-# Common runtime tokens: {player}, {victim}, {streak}, {best_streak}, {milestone}, {version}, {author}, {cooldown}, {sender}, {command}, {index}
+# Common runtime tokens: {player}, {killer}, {victim}, {streak}, {best_streak}, {milestone}, {version}, {author}, {cooldown}, {sender}, {command}, {index}
 
 tokens:
   prefix: ":diamond_sword: {theme}FoKillstreak &8» {muted}"
@@ -29,6 +29,7 @@ killstreak:
 
 broadcasts:
   milestone: "{prefix}:fire_charge: {theme}{player}{muted} reached a {theme}{streak}{muted} killstreak."
+  streak-ended: "{prefix}:iron_sword: {theme}{killer}{muted} ended {theme}{victim}{muted}'s {theme}{streak}{muted} killstreak."
 
 editor:
   saved: "{prefix}:emerald: {good}Saved {theme}{setting}{muted}."
@@ -47,86 +48,96 @@ editor:
 gui:
   admin:
     title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ ᴇᴅɪᴛᴏʀ"
-    player-death-reset-enabled-name: "{good}ᴘᴠᴘ ᴅᴇᴀᴛʜ ʀᴇꜱᴇᴛꜱ"
-    player-death-reset-disabled-name: "{bad}ᴀʟʟ ᴅᴇᴀᴛʜꜱ ʀᴇꜱᴇᴛ"
+    player-death-reset-enabled-name: "{good}PLAYER DEATH RESETS"
+    player-death-reset-disabled-name: "{bad}ALL DEATHS RESET"
     player-death-reset-lore:
       - "{white}Click to toggle natural death resets."
       - "{white}Current: {state}"
-    broadcasts-enabled-name: "{good}ᴍɪʟᴇꜱᴛᴏɴᴇ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ"
-    broadcasts-disabled-name: "{bad}ᴍɪʟᴇꜱᴛᴏɴᴇ ʙʀᴏᴀᴅᴄᴀꜱᴛꜱ"
+    broadcasts-enabled-name: "{good}MILESTONE BROADCASTS"
+    broadcasts-disabled-name: "{bad}MILESTONE BROADCASTS"
     broadcasts-lore:
       - "{white}Click to toggle milestone broadcasts."
       - "{white}Current: {state}"
-    cooldown-enabled-name: "{good}ꜱᴀᴍᴇ-ᴠɪᴄᴛɪᴍ ᴄᴏᴏʟᴅᴏᴡɴ"
-    cooldown-disabled-name: "{bad}ꜱᴀᴍᴇ-ᴠɪᴄᴛɪᴍ ᴄᴏᴏʟᴅᴏᴡɴ"
+    ended-streak-enabled-name: "{good}ENDED-STREAK BROADCASTS"
+    ended-streak-disabled-name: "{bad}ENDED-STREAK BROADCASTS"
+    ended-streak-lore:
+      - "{white}Click to toggle ended-streak announcements."
+      - "{white}Current: {state}"
+    announce-threshold-name: "{theme}ANNOUNCE THRESHOLD"
+    announce-threshold-lore:
+      - "{white}Click to edit in chat."
+      - "{white}Sets the ended-streak announcement threshold."
+      - "{white}Current: {theme}{threshold} kills"
+    cooldown-enabled-name: "{good}SAME-VICTIM COOLDOWN"
+    cooldown-disabled-name: "{bad}SAME-VICTIM COOLDOWN"
     cooldown-lore:
       - "{white}Click to toggle farming protection."
       - "{white}Current: {state}"
-    cooldown-seconds-name: "{theme}ᴄᴏᴏʟᴅᴏᴡɴ ꜱᴇᴄᴏɴᴅꜱ"
+    cooldown-seconds-name: "{theme}COOLDOWN SECONDS"
     cooldown-seconds-lore:
       - "{white}Click to edit in chat."
       - "{white}Current: {theme}{seconds}s"
-    milestones-name: "{theme}ᴍɪʟᴇꜱᴛᴏɴᴇꜱ"
+    milestones-name: "{theme}MILESTONES"
     milestones-lore:
       - "{white}Click to edit in chat."
       - "{white}Current: {theme}{milestones}"
-    rewards-name: "{theme}ʀᴇᴡᴀʀᴅꜱ"
+    rewards-name: "{theme}REWARDS"
     rewards-lore:
       - "{white}Click to edit killstreak rewards."
       - "{white}Configured: {theme}{count}"
-    reload-name: "{theme}ʀᴇʟᴏᴀᴅ ꜰɪʟᴇꜱ"
+    reload-name: "{theme}RELOAD FILES"
     reload-lore:
       - "{white}Reload config.yml and messages.yml."
     state-enabled: "{good}Enabled"
     state-disabled: "{bad}Disabled"
   rewards:
     title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ ʀᴇᴡᴀʀᴅꜱ"
-    reward-name: "{theme}{streak} ᴋɪʟʟꜱ"
+    reward-name: "{theme}{streak} KILLS"
     reward-lore:
       - "{white}Sender: {theme}{sender}"
       - "{white}Command: {theme}{command}"
       - "{white}Click to edit."
-    empty-name: "{bad}ɴᴏ ʀᴇᴡᴀʀᴅꜱ"
+    empty-name: "{bad}NO REWARDS"
     empty-lore:
       - "{white}Click Add Reward below."
-    add-name: "{good}ᴀᴅᴅ ʀᴇᴡᴀʀᴅ"
+    add-name: "{good}ADD REWARD"
     add-lore:
       - "{white}Create killstreak reward."
   reward-sender:
     title: "&8ꜱᴇʟᴇᴄᴛ ʀᴇᴡᴀʀᴅ ꜱᴇɴᴅᴇʀ"
-    console-name: "{theme}ᴄᴏɴꜱᴏʟᴇ"
+    console-name: "{theme}CONSOLE"
     console-lore:
       - "{white}Run reward command from console."
       - "{white}Streak: {theme}{streak}"
-    player-name: "{theme}ᴘʟᴀʏᴇʀ"
+    player-name: "{theme}PLAYER"
     player-lore:
       - "{white}Run reward command as killer."
       - "{white}Streak: {theme}{streak}"
   reward-edit:
     title: "&8ᴇᴅɪᴛ ʀᴇᴡᴀʀᴅ"
-    streak-name: "{theme}ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+    streak-name: "{theme}KILLSTREAK"
     streak-lore:
       - "{white}Reward runs at {theme}{streak}{white} kills."
-    sender-name: "{theme}ꜱᴇɴᴅᴇʀ"
+    sender-name: "{theme}SENDER"
     sender-lore:
       - "{white}Click to cycle sender."
       - "{console}"
       - "{player}"
     sender-selected: "{theme}{sender}"
     sender-unselected: "{white}{sender}"
-    command-name: "{theme}ᴄᴏᴍᴍᴀɴᴅ"
+    command-name: "{theme}COMMAND"
     command-lore:
       - "{white}Click to edit in chat."
       - "{white}Current: {theme}{command}"
-    delete-name: "{bad}ᴅᴇʟᴇᴛᴇ"
+    delete-name: "{bad}DELETE"
     delete-lore:
       - "{white}Open delete confirmation."
   reward-delete:
     title: "&8ᴅᴇʟᴇᴛᴇ ʀᴇᴡᴀʀᴅ"
-    confirm-name: "{good}ᴄᴏɴꜰɪʀᴍ"
+    confirm-name: "{good}CONFIRM"
     confirm-lore:
       - "{white}Delete reward for {theme}{streak}{white} kills."
       - "{white}{command}"
-    cancel-name: "{bad}ᴄᴀɴᴄᴇʟ"
+    cancel-name: "{bad}CANCEL"
     cancel-lore:
       - "{white}Keep this reward."
