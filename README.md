@@ -174,4 +174,26 @@ handlers must not assume every dispatch runs on the global primary thread,
 especially on regionized servers. Reacquire the service after a provider
 disable and later enable rather than caching a stale instance.
 
+### Complete public API method index
+
+Signatures use short type names; import Fo types from this plugin's `api` package and Bukkit types from Bukkit.
+
+#### `KillstreakService`
+
+```java
+Optional<StreakSnapshot> getStreak(UUID);
+List<StreakLeaderboardEntry> getTop(StreakType, int);
+int getRank(UUID, StreakType);
+ChangeResult setStreak(UUID, String, StreakType, int);
+ChangeResult resetCurrent(UUID, String);
+CreditResult creditKill(Player, Player);
+```
+
+**Other public contract types:** `ChangeCause`, `ChangeResult`, `CreditResult`, `StreakLeaderboardEntry`, `StreakSnapshot`, `StreakType`.
+
+### Complete Bukkit event index
+
+- `KillCreditPreEvent`.
+- `KillstreakChangeEvent`.
+
 </details>
