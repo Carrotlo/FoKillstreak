@@ -20,11 +20,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 public final class StreakStorage {
     private static final long LEADERBOARD_REBUILD_INTERVAL_MILLIS = 1_000L;
 
     private final JavaPlugin plugin;
+    private final File databaseFile;
+    private final Logger logger;
     private final Map<UUID, StreakRecord> cache = new HashMap<>();
     private final Map<LeaderboardType, List<StreakRecord>> leaderboardRecords = new EnumMap<>(LeaderboardType.class);
     private final Map<LeaderboardType, Map<UUID, Integer>> leaderboardRanks = new EnumMap<>(LeaderboardType.class);
@@ -34,18 +37,27 @@ public final class StreakStorage {
 
     public StreakStorage(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.databaseFile = null;
+        this.logger = plugin.getLogger();
+    }
+
+    StreakStorage(File databaseFile, Logger logger) {
+        this.plugin = null;
+        this.databaseFile = databaseFile;
+        this.logger = logger;
     }
 
     public boolean open() {
         try {
-            if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
-                plugin.getLogger().severe("Could not create plugin data folder.");
+            File file = databaseFile == null ? ResourceFiles.dataFile(plugin, "data.db") : databaseFile;
+            File folder = file.getParentFile();
+            if (folder != null && !folder.exists() && !folder.mkdirs()) {
+                logger.severe("Could not create plugin data folder.");
                 return false;
             }
 
             Class.forName(JDBC.class.getName());
-            File databaseFile = ResourceFiles.dataFile(plugin, "data.db");
-            connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
+            connection = DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath());
 
             try (Statement statement = connection.createStatement()) {
                 statement.execute("PRAGMA journal_mode=WAL");
@@ -64,7 +76,7 @@ public final class StreakStorage {
             loadAll();
             return true;
         } catch (ClassNotFoundException | SQLException exception) {
-            plugin.getLogger().severe("Could not open SQLite database: " + exception.getMessage());
+            logger.severe("Could not open SQLite database: " + exception.getMessage());
             return false;
         }
     }
@@ -76,45 +88,48 @@ public final class StreakStorage {
         try {
             connection.close();
         } catch (SQLException exception) {
-            plugin.getLogger().warning("Could not close SQLite database: " + exception.getMessage());
+            logger.warning("Could not close SQLite database: " + exception.getMessage());
         } finally {
             connection = null;
         }
     }
 
-    public synchronized StreakRecord addKill(Player player) {
-        StreakRecord record = getOrCreate(player);
+    public synchronized Mutation addKill(Player player) {
+        StreakRecord previous = cache.get(player.getUniqueId());
+        StreakRecord record = previous == null ? empty(player.getUniqueId(), player.getName()) : previous.copy();
+        if (record.currentStreak() == Integer.MAX_VALUE) {
+            return new Mutation(MutationStatus.INVALID, copyOrNull(previous), copyOrNull(previous));
+        }
         record.currentStreak(record.currentStreak() + 1);
         if (record.currentStreak() > record.bestStreak()) {
             record.bestStreak(record.currentStreak());
         }
         record.updatedAt(System.currentTimeMillis());
-        save(record);
-        markLeaderboardsDirty();
-        return record.copy();
+        return commit(previous, record, true);
     }
 
-    public synchronized StreakRecord reset(Player player) {
-        StreakRecord record = getOrCreate(player);
-        boolean changed = record.currentStreak() != 0 || !record.name().equals(player.getName());
-        record.name(player.getName());
+    public synchronized Mutation reset(UUID uuid, String name) {
+        StreakRecord previous = cache.get(uuid);
+        StreakRecord record = previous == null ? empty(uuid, name) : previous.copy();
+        boolean valueChanged = record.currentStreak() != 0;
+        boolean nameChanged = !record.name().equals(name);
+        if (!valueChanged && !nameChanged) {
+            return new Mutation(MutationStatus.UNCHANGED, copyOrNull(previous), copyOrNull(previous));
+        }
+        record.name(name);
         record.currentStreak(0);
         record.updatedAt(System.currentTimeMillis());
-        if (changed) {
-            save(record);
-            markLeaderboardsDirty();
-        }
-        return record.copy();
+        return commit(previous, record, valueChanged);
     }
 
-    public synchronized StreakRecord setStreak(UUID uuid, String name, int streak, LeaderboardType type) {
-        StreakRecord record = cache.computeIfAbsent(uuid, ignored -> new StreakRecord(
-                uuid,
-                name,
-                0,
-                0,
-                System.currentTimeMillis()
-        ));
+    public synchronized Mutation setStreak(UUID uuid, String name, int streak, LeaderboardType type) {
+        StreakRecord previous = cache.get(uuid);
+        StreakRecord record = previous == null ? empty(uuid, name) : previous.copy();
+        boolean valueChanged = (type == LeaderboardType.CURRENT ? record.currentStreak() : record.bestStreak()) != streak;
+        boolean nameChanged = !record.name().equals(name);
+        if (!valueChanged && !nameChanged && previous != null) {
+            return new Mutation(MutationStatus.UNCHANGED, copyOrNull(previous), copyOrNull(previous));
+        }
         record.name(name);
         if (type == LeaderboardType.CURRENT) {
             record.currentStreak(streak);
@@ -122,9 +137,11 @@ public final class StreakStorage {
             record.bestStreak(streak);
         }
         record.updatedAt(System.currentTimeMillis());
-        save(record);
-        markLeaderboardsDirty();
-        return record.copy();
+        return commit(previous, record, valueChanged);
+    }
+
+    public synchronized Optional<StreakRecord> find(UUID uuid) {
+        return Optional.ofNullable(cache.get(uuid)).map(StreakRecord::copy);
     }
 
     public synchronized Optional<StreakRecord> findByName(String name) {
@@ -175,7 +192,7 @@ public final class StreakStorage {
             while (result.next()) {
                 UUID uuid = parseUuid(result.getString("uuid"));
                 if (uuid == null) {
-                    plugin.getLogger().warning("Skipping streak row with invalid UUID: " + result.getString("uuid"));
+                    logger.warning("Skipping streak row with invalid UUID: " + result.getString("uuid"));
                     continue;
                 }
                 cache.put(uuid, new StreakRecord(
@@ -198,17 +215,29 @@ public final class StreakStorage {
         }
     }
 
-    private StreakRecord getOrCreate(Player player) {
-        return cache.computeIfAbsent(player.getUniqueId(), uuid -> new StreakRecord(
-                uuid,
-                player.getName(),
-                0,
-                0,
-                System.currentTimeMillis()
-        ));
+    private StreakRecord empty(UUID uuid, String name) {
+        return new StreakRecord(uuid, name, 0, 0, System.currentTimeMillis());
     }
 
-    private void save(StreakRecord record) {
+    private StreakRecord copyOrNull(StreakRecord record) {
+        return record == null ? null : record.copy();
+    }
+
+    private Mutation commit(StreakRecord previous, StreakRecord record, boolean valueChanged) {
+        if (!save(record)) {
+            return new Mutation(MutationStatus.SAVE_FAILED, copyOrNull(previous), copyOrNull(previous));
+        }
+        cache.put(record.uuid(), record);
+        markLeaderboardsDirty();
+        return new Mutation(valueChanged ? MutationStatus.CHANGED : MutationStatus.UNCHANGED,
+                copyOrNull(previous), record.copy());
+    }
+
+    private boolean save(StreakRecord record) {
+        if (connection == null) {
+            logger.severe("Could not save streak data for " + record.name() + ": database is closed");
+            return false;
+        }
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO player_streaks (uuid, name, current_streak, best_streak, updated_at)
                 VALUES (?, ?, ?, ?, ?)
@@ -224,9 +253,16 @@ public final class StreakStorage {
             statement.setInt(4, record.bestStreak());
             statement.setLong(5, record.updatedAt());
             statement.executeUpdate();
+            return true;
         } catch (SQLException exception) {
-            plugin.getLogger().severe("Could not save streak data for " + record.name() + ": " + exception.getMessage());
+            logger.severe("Could not save streak data for " + record.name() + ": " + exception.getMessage());
+            return false;
         }
+    }
+
+    public enum MutationStatus { CHANGED, UNCHANGED, INVALID, SAVE_FAILED }
+
+    public record Mutation(MutationStatus status, StreakRecord previous, StreakRecord current) {
     }
 
     private List<StreakRecord> sortedPositiveRecords(LeaderboardType type) {

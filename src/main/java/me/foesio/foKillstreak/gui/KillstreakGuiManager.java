@@ -7,14 +7,15 @@ import me.foesio.core.dialog.TextDialogRequest;
 import me.foesio.core.editor.EditorDialogInputs;
 import me.foesio.core.editor.EditorItemFactory;
 import me.foesio.core.gui.GuiButtonConfig;
-import me.foesio.core.gui.GuiItemConfig;
-import me.foesio.core.gui.GuiItems;
-import me.foesio.core.gui.GuiTitles;
+import me.foesio.core.gui.publicgui.PublicGuiDefinition;
+import me.foesio.core.gui.publicgui.PublicGuiInventoryHolder;
+import me.foesio.core.gui.publicgui.PublicGuiRenderInput;
+import me.foesio.core.gui.publicgui.PublicGuiService;
+import me.foesio.core.gui.publicgui.PublicGuiText;
 import me.foesio.core.gui.EntryBrowserClick;
 import me.foesio.core.gui.EntryBrowserHolder;
 import me.foesio.core.gui.EntryBrowserMenus;
 import me.foesio.core.gui.EntryBrowserRequest;
-import me.foesio.core.material.MaterialTypes;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.message.FoStyle;
 import me.foesio.core.number.DurationParser;
@@ -33,6 +34,7 @@ import me.foesio.foKillstreak.data.LeaderboardEntry;
 import me.foesio.foKillstreak.data.LeaderboardType;
 import me.foesio.foKillstreak.data.StreakStorage;
 import me.foesio.foKillstreak.message.MessageFallbacks;
+import me.foesio.foKillstreak.message.PublicMessageDelivery;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -63,6 +65,8 @@ public final class KillstreakGuiManager implements Listener {
     private static final GuiButtonConfig BUTTONS = GuiButtonConfig.defaults();
     private static final long LEADERBOARD_OPEN_COOLDOWN_MILLIS = 500L;
     private static final long LEADERBOARD_TAB_COOLDOWN_MILLIS = 200L;
+    public static final String LEADERBOARD_MENU_ID = "killstreak.leaderboard";
+    public static final String LEADERBOARD_ENTRY_POINT = "command:/killstreak";
     private static final int ADMIN_SIZE = 36;
     private static final int SLOT_RELOAD = 10;
     private static final int SLOT_REWARDS = 11;
@@ -79,6 +83,7 @@ public final class KillstreakGuiManager implements Listener {
     private final FoKillstreak plugin;
     private final ConfigService config;
     private final GuiConfigService guiConfig;
+    private final PublicGuiService publicGuis;
     private final FoMessageService messages;
     private final StreakStorage storage;
     private final FoSoundService sounds;
@@ -92,10 +97,11 @@ public final class KillstreakGuiManager implements Listener {
     private final Map<UUID, PendingRewardState> pendingRewardStates = new ConcurrentHashMap<>();
     private final Map<UUID, RewardDeleteState> rewardDeleteStates = new ConcurrentHashMap<>();
 
-    public KillstreakGuiManager(FoKillstreak plugin, ConfigService config, GuiConfigService guiConfig, FoMessageService messages, StreakStorage storage, NativeDialogSupport nativeDialogs, FoSoundService sounds, FoEditorSounds editorSounds, FoGuiSounds guiSounds) {
+    public KillstreakGuiManager(FoKillstreak plugin, ConfigService config, GuiConfigService guiConfig, PublicGuiService publicGuis, FoMessageService messages, StreakStorage storage, NativeDialogSupport nativeDialogs, FoSoundService sounds, FoEditorSounds editorSounds, FoGuiSounds guiSounds) {
         this.plugin = plugin;
         this.config = config;
         this.guiConfig = guiConfig;
+        this.publicGuis = publicGuis;
         this.messages = messages;
         this.storage = storage;
         this.sounds = sounds;
@@ -109,6 +115,10 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     public void openLeaderboard(Player player) {
+        if (!guiConfig.available() || publicGuis.snapshot() == null) {
+            send(player, "commands.leaderboard-unavailable");
+            return;
+        }
         if (!canOpenLeaderboard(player)) {
             return;
         }
@@ -116,7 +126,7 @@ public final class KillstreakGuiManager implements Listener {
         openLeaderboard(player, LeaderboardType.CURRENT);
     }
 
-    void openLeaderboardTab(Player player, LeaderboardType type) {
+    public void openLeaderboardTab(Player player, LeaderboardType type) {
         if (!canUseLeaderboardAction(player, leaderboardTabTimes, LEADERBOARD_TAB_COOLDOWN_MILLIS)) {
             return;
         }
@@ -132,18 +142,32 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     private void openLeaderboardFallback(Player player) {
-        int size = guiRows("rows", 3) * 9;
-        Inventory inventory = Bukkit.createInventory(null, size,
-                GuiTitles.format(guiConfig.getString("title", "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ")));
-        fill(player, inventory, guiMaterial("filler.material",
-                guiMaterial("filler-material", Material.LIGHT_GRAY_STAINED_GLASS_PANE)));
+        if (publicGuis.snapshot() == null) {
+            send(player, "commands.leaderboard-unavailable");
+            return;
+        }
+        PublicGuiDefinition definition = publicGuis.snapshot().require(LEADERBOARD_MENU_ID);
+        Map<String, PublicGuiText.CycleSelection> cycles = new java.util.HashMap<>();
+        if (definition.buttons().get("current").enabled()) {
+            cycles.put("current", leaderboardLore(player, LeaderboardType.CURRENT));
+        }
+        if (definition.buttons().get("best").enabled()) {
+            cycles.put("best", leaderboardLore(player, LeaderboardType.BEST));
+        }
+        publicGuis.openEntryPoint(player, LEADERBOARD_ENTRY_POINT,
+                new PublicGuiRenderInput(leaderboardStyleTokens(), Map.of(), cycles, Map.of()));
+    }
 
-        inventory.setItem(guiSlot("current.slot", 11, size), configuredLeaderboardItem(player, "current",
-                Material.DIAMOND_SWORD, "{theme}ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ", leaderboardLore(player, LeaderboardType.CURRENT)));
-        inventory.setItem(guiSlot("best.slot", 15, size), configuredLeaderboardItem(player, "best",
-                Material.NETHER_STAR, "{theme}ʙᴇsᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ", leaderboardLore(player, LeaderboardType.BEST)));
-
-        player.openInventory(inventory);
+    private Map<String, String> leaderboardStyleTokens() {
+        Map<String, String> configured = messages.tokenValues();
+        Map<String, String> values = new java.util.HashMap<>();
+        for (String key : List.of("theme", "muted", "white", "yellow", "good", "bad")) {
+            String value = configured.get(key);
+            if (value != null) {
+                values.put(key, value);
+            }
+        }
+        return Map.copyOf(values);
     }
 
     private void openRewardBrowser(Player player) {
@@ -379,13 +403,11 @@ public final class KillstreakGuiManager implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-
-        String title = event.getView().getTitle();
-        if (title.equals(FoText.color(guiConfig.getString("title", "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ")))) {
-            event.setCancelled(true);
+        if (event.getView().getTopInventory().getHolder() instanceof PublicGuiInventoryHolder) {
             return;
         }
 
+        String title = event.getView().getTitle();
         if (isAdminEditorTitle(title) && !player.hasPermission("fokillstreak.admin")) {
             event.setCancelled(true);
             player.closeInventory();
@@ -426,6 +448,9 @@ public final class KillstreakGuiManager implements Listener {
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+        if (event.getView().getTopInventory().getHolder() instanceof PublicGuiInventoryHolder) {
             return;
         }
 
@@ -893,35 +918,49 @@ public final class KillstreakGuiManager implements Listener {
         );
     }
 
-    private List<String> leaderboardLore(Player player, LeaderboardType type) {
+    private PublicGuiText.CycleSelection leaderboardLore(Player player, LeaderboardType type) {
         UUID uuid = player.getUniqueId();
-        List<LeaderboardEntry> top = storage.top(type, 10);
+        int limit = Math.max(1, Math.min(100, guiConfig.getInt("inventory.limit", 10)));
+        List<LeaderboardEntry> top = storage.top(type, limit);
         List<String> lore = new ArrayList<>();
-        for (int rank = 1; rank <= 10; rank++) {
+        for (int rank = 1; rank <= limit; rank++) {
             if (top.size() >= rank) {
                 LeaderboardEntry entry = top.get(rank - 1);
-                lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.entry", "{theme}#{rank} {white}{player} {muted}- {theme}{streak}"), Map.of(
-                        "rank", String.valueOf(entry.rank()),
+                addVisibleLine(lore, messages.renderTemplateForViewer(player, guiConfig.getString("inventory.entry", ""), Map.of(
+                        "rank", guiConfig.formatNumber(entry.rank()),
                         "player", entry.name(),
-                        "streak", String.valueOf(entry.streak())
+                        "streak", guiConfig.formatNumber(entry.streak())
                 )));
             } else {
-                lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.empty", "{muted}#{rank} Empty"), Map.of("rank", String.valueOf(rank))));
+                addVisibleLine(lore, messages.renderTemplateForViewer(player, guiConfig.getString("inventory.empty", ""), Map.of("rank", guiConfig.formatNumber(rank))));
             }
         }
 
-        lore.add(FoText.color("&r"));
+        if (guiConfig.has("inventory.separator")) {
+            addVisibleLine(lore, messages.renderTemplateForViewer(player,
+                    guiConfig.getString("inventory.separator", ""), Map.of()));
+        }
         int rank = storage.rank(uuid, type);
         int streak = type == LeaderboardType.CURRENT ? storage.currentStreak(uuid) : storage.bestStreak(uuid);
+        String ownPosition;
         if (rank > 0) {
-            lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.position", "{white}Your position: {theme}#{rank} {muted}({streak})"), Map.of(
-                    "rank", String.valueOf(rank),
-                    "streak", String.valueOf(streak)
-            )));
+            ownPosition = messages.renderTemplateForViewer(player, guiConfig.getString("inventory.position", ""), Map.of(
+                    "rank", guiConfig.formatNumber(rank),
+                    "streak", guiConfig.formatNumber(streak)
+            ));
         } else {
-            lore.add(messages.renderTemplateForViewer(player, guiConfig.getString("lines.unranked", "{white}Your position: {muted}Unranked"), Map.of()));
+            ownPosition = messages.renderTemplateForViewer(player,
+                    guiConfig.getString("inventory.unranked", ""), Map.of());
         }
-        return lore;
+        int selectedIndex = ownPosition.isEmpty() ? -1 : lore.size();
+        addVisibleLine(lore, ownPosition);
+        return new PublicGuiText.CycleSelection(lore, selectedIndex);
+    }
+
+    private void addVisibleLine(List<String> lore, String line) {
+        if (!line.isEmpty()) {
+            lore.add(line);
+        }
     }
 
     private int rewardCount() {
@@ -1042,11 +1081,11 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     private void send(Player player, String path) {
-        messages.send(player, path, MessageFallbacks.string(path));
+        PublicMessageDelivery.send(messages, player, path);
     }
 
     private void send(Player player, String path, Map<String, String> placeholders) {
-        messages.send(player, path, MessageFallbacks.string(path), placeholders);
+        PublicMessageDelivery.send(messages, player, path, placeholders);
     }
 
     private String message(String path, Map<String, String> placeholders) {
@@ -1083,38 +1122,10 @@ public final class KillstreakGuiManager implements Listener {
     }
 
     private void fill(Inventory inventory, Material material) {
-        fill(null, inventory, material);
-    }
-
-    private void fill(Player viewer, Inventory inventory, Material material) {
-        String name = guiConfig.getString("filler.name", " ");
-        List<String> lore = guiConfig.getStringList("filler.lore");
-        Integer customModelData = GuiItemConfig.parseCustomModelData(guiConfig.get("filler.custom-model-data"), null);
-        String renderedName = viewer == null ? messages.renderTemplate(name, Map.of())
-                : messages.renderTemplateForViewer(viewer, name, Map.of());
-        List<String> renderedLore = lore.stream()
-                .map(line -> viewer == null ? messages.renderTemplate(line, Map.of())
-                        : messages.renderTemplateForViewer(viewer, line, Map.of()))
-                .toList();
-        ItemStack filler = GuiItems.create(viewer, material, renderedName, renderedLore, false, 1, customModelData);
+        ItemStack filler = item(material, " ", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, filler.clone());
         }
-    }
-
-    private ItemStack configuredLeaderboardItem(Player player, String path, Material fallbackMaterial,
-            String fallbackName, List<String> fallbackLore) {
-        Material material = guiMaterial(path + ".material", fallbackMaterial);
-        String name = guiConfig.getString(path + ".name", fallbackName);
-        List<String> lore = guiConfig.getStringList(path + ".lore");
-        if (lore.isEmpty()) {
-            lore = fallbackLore;
-        }
-        Integer customModelData = GuiItemConfig.parseCustomModelData(guiConfig.get(path + ".custom-model-data"), null);
-        return GuiItems.create(player, material,
-                messages.renderTemplateForViewer(player, name, Map.of()),
-                lore.stream().map(line -> messages.renderTemplateForViewer(player, line, Map.of())).toList(),
-                false, 1, customModelData);
     }
 
     private ItemStack displayItem(Player player, Material material, String name, List<String> lore) {
@@ -1136,24 +1147,6 @@ public final class KillstreakGuiManager implements Listener {
         return item;
     }
 
-    private Material guiMaterial(String path, Material fallback) {
-        String configured = guiConfig.getString(path, fallback.name());
-        Material material = MaterialTypes.match(configured);
-        return material == null ? fallback : material;
-    }
-
-    private int guiRows(String path, int fallback) {
-        int rows = guiConfig.getInt(path, fallback);
-        return Math.max(3, Math.min(6, rows));
-    }
-
-    private int guiSlot(String path, int fallback, int inventorySize) {
-        int slot = guiConfig.getInt(path, fallback);
-        if (slot < 0 || slot >= inventorySize) {
-            return Math.max(0, Math.min(inventorySize - 1, fallback));
-        }
-        return slot;
-    }
 
     private record RewardBrowserState(int page, String search) {
     }

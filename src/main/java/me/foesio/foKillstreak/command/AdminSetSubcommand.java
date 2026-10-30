@@ -7,6 +7,9 @@ import me.foesio.core.sound.FoAdminSounds;
 import me.foesio.foKillstreak.data.LeaderboardType;
 import me.foesio.foKillstreak.data.StreakRecord;
 import me.foesio.foKillstreak.data.StreakStorage;
+import me.foesio.foKillstreak.api.ChangeResult;
+import me.foesio.foKillstreak.api.StreakType;
+import me.foesio.foKillstreak.listener.KillstreakListener;
 import me.foesio.foKillstreak.message.MessageFallbacks;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -27,15 +30,17 @@ public final class AdminSetSubcommand {
     private static final List<String> STREAK_TYPES = List.of("best", "current");
 
     private final StreakStorage storage;
+    private final KillstreakListener killstreakService;
     private final FoAdminSounds adminSounds;
 
-    private AdminSetSubcommand(StreakStorage storage, FoAdminSounds adminSounds) {
+    private AdminSetSubcommand(StreakStorage storage, KillstreakListener killstreakService, FoAdminSounds adminSounds) {
         this.storage = storage;
+        this.killstreakService = killstreakService;
         this.adminSounds = adminSounds;
     }
 
-    public static FoAdminSubcommand create(StreakStorage storage, FoAdminSounds adminSounds) {
-        AdminSetSubcommand command = new AdminSetSubcommand(storage, adminSounds);
+    public static FoAdminSubcommand create(StreakStorage storage, KillstreakListener killstreakService, FoAdminSounds adminSounds) {
+        AdminSetSubcommand command = new AdminSetSubcommand(storage, killstreakService, adminSounds);
         return FoAdminSubcommand.builder("set", command::execute)
                 .usage("set <player> <streak> <best|current>")
                 .tabCompleter(command::tabComplete)
@@ -70,7 +75,14 @@ public final class AdminSetSubcommand {
             return true;
         }
 
-        storage.setStreak(target.uuid(), target.name(), streak, type);
+        ChangeResult result = killstreakService.setStreakFromAdmin(target.uuid(), target.name(),
+                type == LeaderboardType.CURRENT ? StreakType.CURRENT : StreakType.BEST, streak);
+        if (result != ChangeResult.CHANGED && result != ChangeResult.UNCHANGED) {
+            context.messages().send(context.sender(), "commands.streak-save-failed",
+                    MessageFallbacks.string("commands.streak-save-failed"));
+            adminSounds.updateError(context.sender());
+            return true;
+        }
         context.messages().send(context.sender(), "commands.streak-set", MessageFallbacks.string("commands.streak-set"), Map.of(
                 "player", target.name(),
                 "streak", String.valueOf(streak),

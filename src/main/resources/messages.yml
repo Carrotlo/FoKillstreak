@@ -15,17 +15,20 @@ tokens:
 commands:
   no-permission: "{prefix}{bad}No permission{muted}."
   only-player: "{prefix}{bad}Player only{muted}."
+  leaderboard-unavailable: "{prefix}{bad}The leaderboard is unavailable{muted}. Please contact a server administrator."
   usage-admin: "{prefix}:paper: Use {theme}/fokillstreakadmin <version|reload|editor|set>{muted}."
   usage-set: "{prefix}Use {theme}/fokillstreakadmin set <player> <streak> <best|current>{muted}."
-  reloaded: "{prefix}:emerald: {good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, and {theme}guis/{muted}."
+  reloaded: "{prefix}:emerald: {good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, {theme}sounds.yml{muted}, {theme}guis/{muted}, and {theme}dialogs/{muted}."
   reload-failed: "{prefix}:redstone: {bad}Reload failed{muted}. Check console."
   player-not-found: "{prefix}:player_head: {bad}Player not found{muted}. They must be online or known to the server."
   invalid-streak: "{prefix}{bad}Invalid streak{muted}. Use a whole number of {theme}0{muted} or higher."
   invalid-streak-type: "{prefix}{bad}Invalid type{muted}. Use {theme}best{muted} or {theme}current{muted}."
   streak-set: "{prefix}:emerald: {good}Set {theme}{player}{muted}'s {theme}{type}{muted} streak to {theme}{streak}{muted}."
+  streak-save-failed: "{prefix}:redstone: {bad}Could not save streak data{muted}. Check console."
 
 killstreak:
   cooldown-blocked: "{prefix}:clock: {bad}No streak gained{muted}. Wait {theme}{cooldown}s{muted} before killing {theme}{victim}{muted} again."
+  capacity-blocked: "{prefix}:clock: {bad}No streak gained{muted}. Please try again shortly."
 
 broadcasts:
   milestone: "{prefix}:fire_charge: {theme}{player}{muted} reached a {theme}{streak}{muted} killstreak."

@@ -1,0 +1,35 @@
+# Shared leaderboard text for the inventory and native dialog.
+# The GUI's selected cycle format styles the viewer-position line;
+# the unselected format styles rank, empty-rank, and separator lines.
+number-locale: en-US
+inventory:
+  limit: 10
+  entry: "{theme}#{rank} {white}{player} {muted}- {theme}{streak}"
+  empty: "{muted}#{rank} Empty"
+  separator: "&r"
+  position: "{white}Your position: {theme}#{rank} {muted}({streak})"
+  unranked: "{white}Your position: {muted}Unranked"
+native:
+  title: "{white}Top Killstreaks"
+  body-width: 260
+  button-width: 150
+  columns: 2
+  button-order: [current, best]
+  limit: 10
+  symbol: "☠"
+  line-format: "{rank_color}#{rank} {white}{player} &8- &c{skull} {white}{streak}"
+  empty-player: "---"
+  empty-streak: "---"
+  first-color: "#ffd84d"
+  second-color: "#c9d1d9"
+  third-color: "#d9822b"
+  default-color: "#a7b8b0"
+  title-color: "{white}"
+  inactive-button-color: "{white}"
+  tooltip-color: "{muted}"
+  current-button: "{white}Current"
+  best-button: "{white}Best"
+  selected-button-color: "{muted}"
+  selected-current-button: "{muted}☠ Current"
+  selected-best-button: "{muted}☠ Best"
+  switch-tooltip: "{theme}Switch leaderboard"

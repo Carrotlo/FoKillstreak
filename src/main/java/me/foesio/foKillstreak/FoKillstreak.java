@@ -7,6 +7,8 @@ import me.foesio.core.command.FoAdminMessages;
 import me.foesio.core.command.FoAdminSubcommand;
 import me.foesio.core.message.FoMessageMigrations;
 import me.foesio.core.message.FoMessageService;
+import me.foesio.core.gui.publicgui.GuiLoadReport;
+import me.foesio.core.gui.publicgui.PublicGuiService;
 import me.foesio.core.placeholder.FoPlaceholders;
 import me.foesio.core.reload.FoReloadRegistry;
 import me.foesio.core.reload.FoReloadResult;
@@ -16,19 +18,31 @@ import me.foesio.core.sound.FoGuiSounds;
 import me.foesio.core.sound.FoSoundService;
 import me.foesio.core.update.UpdateNoticeService;
 import me.foesio.foKillstreak.command.AdminSetSubcommand;
+import me.foesio.foKillstreak.api.KillstreakService;
 import me.foesio.foKillstreak.command.PlayerCommand;
 import me.foesio.foKillstreak.config.ConfigService;
 import me.foesio.foKillstreak.config.GuiConfigService;
 import me.foesio.foKillstreak.data.LeaderboardType;
 import me.foesio.foKillstreak.data.StreakStorage;
 import me.foesio.foKillstreak.gui.KillstreakGuiManager;
+import me.foesio.foKillstreak.gui.LeaderboardGuiContract;
 import me.foesio.foKillstreak.listener.KillstreakListener;
 import me.foesio.foKillstreak.message.MessageFallbacks;
+import me.foesio.foKillstreak.message.MessageDefaultMigration;
+import me.foesio.foKillstreak.message.MessageMigrationBackup;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.ServicePriority;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
@@ -40,8 +54,10 @@ public final class FoKillstreak extends JavaPlugin {
     private FoCoreContext core;
     private ConfigService configService;
     private GuiConfigService guiConfigService;
+    private PublicGuiService publicGuis;
     private FoMessageService messageService;
     private StreakStorage streakStorage;
+    private KillstreakListener killstreakService;
     private KillstreakGuiManager guiManager;
     private UpdateNoticeService updateNotices;
     private FoSoundService sounds;
@@ -51,14 +67,26 @@ public final class FoKillstreak extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        boolean freshInstall = Files.notExists(getDataFolder().toPath());
         configService = new ConfigService(this);
         guiConfigService = new GuiConfigService(this);
 
         configService.load();
-        guiConfigService.load();
+        if (freshInstall) {
+            installFreshResource("messages.yml");
+            installFreshResource("sounds.yml");
+        }
+        guiConfigService.initialize(freshInstall);
+        if (guiConfigService.upgradedLegacyGuiFrom() == 1) {
+            installFreshResource("sounds.yml");
+        }
         refreshCoreContext();
-        messageService = FoMessageService.load(this, messageMigrations());
-        migrateSprites();
+        boolean messageMigrationReady = prepareMessageMigration(freshInstall);
+        messageService = FoMessageService.loadPreservingRemovals(this,
+                messageMigrationReady ? messageMigrations() : FoMessageMigrations.none());
+        if (messageMigrationReady) {
+            migrateSprites();
+        }
         updateNotices = core.createUpdateNotices(messageService, MODRINTH_PROJECT_ID, adminSounds).start();
 
         streakStorage = new StreakStorage(this);
@@ -67,17 +95,41 @@ public final class FoKillstreak extends JavaPlugin {
             return;
         }
 
-        guiManager = new KillstreakGuiManager(this, configService, guiConfigService, messageService, streakStorage, core.nativeDialogs(), sounds, editorSounds, guiSounds);
+        publicGuis = new PublicGuiService(this)
+                .menu(KillstreakGuiManager.LEADERBOARD_MENU_ID,
+                        getDataFolder().toPath().resolve("guis/leaderboard.yml"),
+                        LeaderboardGuiContract.contract())
+                .action("leaderboard.current", click -> guiManager.openLeaderboardTab(click.player(), LeaderboardType.CURRENT))
+                .action("leaderboard.best", click -> guiManager.openLeaderboardTab(click.player(), LeaderboardType.BEST))
+                .entryPoint(KillstreakGuiManager.LEADERBOARD_ENTRY_POINT, KillstreakGuiManager.LEADERBOARD_MENU_ID)
+                .requireButton(KillstreakGuiManager.LEADERBOARD_MENU_ID, "current")
+                .requireButton(KillstreakGuiManager.LEADERBOARD_MENU_ID, "best");
+        guiManager = new KillstreakGuiManager(this, configService, guiConfigService, publicGuis, messageService, streakStorage, core.nativeDialogs(), sounds, editorSounds, guiSounds);
+        publicGuis.start();
+        if (guiConfigService.available()) {
+            publicGuis.reload();
+        }
 
-        getServer().getPluginManager().registerEvents(new KillstreakListener(configService, messageService, streakStorage, sounds), this);
+        killstreakService = new KillstreakListener(this, configService, guiConfigService,
+                messageService, streakStorage, sounds);
+        getServer().getPluginManager().registerEvents(killstreakService, this);
         getServer().getPluginManager().registerEvents(guiManager, this);
 
         registerCommands();
+        getServer().getServicesManager().register(KillstreakService.class, killstreakService, this, ServicePriority.Normal);
         registerPlaceholderApi();
     }
 
     @Override
     public void onDisable() {
+        if (killstreakService != null) {
+            getServer().getServicesManager().unregister(KillstreakService.class, killstreakService);
+            killstreakService = null;
+        }
+        if (publicGuis != null) {
+            publicGuis.close();
+            publicGuis = null;
+        }
         if (streakStorage != null) {
             streakStorage.close();
         }
@@ -94,9 +146,20 @@ public final class FoKillstreak extends JavaPlugin {
     public boolean reloadPluginFiles() {
         FoReloadResult result = FoReloadRegistry.create()
                 .add("config", configService::load)
-                .add("guis", guiConfigService::load)
+                .add("leaderboard text", guiConfigService::stage)
+                .add("public GUIs", () -> {
+                    GuiLoadReport report = publicGuis.reload();
+                    if (!report.successful()) {
+                        throw new IllegalStateException("Leaderboard GUI validation failed; previous layout remains active");
+                    }
+                    guiConfigService.commitStaged();
+                })
                 .add("native dialogs", this::refreshCoreContext)
-                .add("sounds", sounds::reload)
+                .add("sounds", () -> {
+                    if (!sounds.reloadChecked()) {
+                        throw new IllegalStateException("Invalid sounds.yml; previous sounds remain active");
+                    }
+                })
                 .addMessages(messageService)
                 .add("leaderboard dialogs", () -> guiManager.reloadNativeDialogs(core.nativeDialogs()))
                 .reload();
@@ -125,7 +188,7 @@ public final class FoKillstreak extends JavaPlugin {
         FoCoreContext refreshedCore = FoPluginCore.create(this, configService.nativeDialogSettings());
         core = refreshedCore;
         if (sounds == null) {
-            sounds = core.createSounds();
+            sounds = FoSoundService.loadPreservingRemovals(this);
             adminSounds = FoAdminSounds.create(sounds);
             editorSounds = FoEditorSounds.create(sounds);
             guiSounds = FoGuiSounds.create(sounds);
@@ -161,25 +224,56 @@ public final class FoKillstreak extends JavaPlugin {
     }
 
     private void migrateSprites() {
-        messageService.migrateToVersion(core.migrations(), 1, config -> {
-            boolean changed = false;
-            changed |= FoMessageService.addMissingToken(config, "tokens.prefix", ":diamond_sword:", null);
-            changed |= FoMessageService.addMissingToken(config, "commands.usage-admin", ":paper:");
-            changed |= FoMessageService.addMissingToken(config, "commands.reloaded", ":emerald:");
-            changed |= FoMessageService.addMissingToken(config, "commands.reload-failed", ":redstone:");
-            changed |= FoMessageService.addMissingToken(config, "commands.player-not-found", ":player_head:");
-            changed |= FoMessageService.addMissingToken(config, "commands.streak-set", ":emerald:");
-            changed |= FoMessageService.addMissingToken(config, "killstreak.cooldown-blocked", ":clock:");
-            changed |= FoMessageService.addMissingToken(config, "broadcasts.milestone", ":fire_charge:");
-            changed |= FoMessageService.addMissingToken(config, "editor.saved", ":emerald:");
-            changed |= FoMessageService.addMissingToken(config, "editor.save-failed", ":redstone:");
-            changed |= FoMessageService.addMissingToken(config, "editor.reward-added", ":emerald:");
-            changed |= FoMessageService.addMissingToken(config, "editor.reward-deleted", ":lava_bucket:");
-            return changed;
-        });
+        YamlConfiguration previousMessages = bundledYaml("migration/messages-v1.yml");
+        YamlConfiguration newestMessages = bundledYaml("messages.yml");
+        messageService.migrateToVersion(core.migrations(), 1,
+                config -> MessageDefaultMigration.migrate(config, previousMessages, newestMessages));
         messageService.migrateToVersion(core.migrations(), 2, this::migrateEditorButtonNames);
         messageService.migrateToVersion(core.migrations(), 3, this::migrateAnnounceThresholdLore);
+        messageService.migrateToVersion(core.migrations(), 4, config -> {
+            List<String> repaired = MessageDefaultMigration.repairLegacyPublic(config, newestMessages);
+            repaired.forEach(value -> getLogger().warning("Message migration substituted bundled default: " + value));
+            boolean changed = replaceExact(config, "commands.reloaded",
+                    "{prefix}:emerald: {good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, and {theme}guis/{muted}.",
+                    "{prefix}:emerald: {good}Reloaded {theme}config.yml{muted}, {theme}messages.yml{muted}, {theme}sounds.yml{muted}, {theme}guis/{muted}, and {theme}dialogs/{muted}.");
+            if (!config.isSet("commands.leaderboard-unavailable")) {
+                config.set("commands.leaderboard-unavailable",
+                        newestMessages.getString("commands.leaderboard-unavailable"));
+                changed = true;
+            }
+            return changed || !repaired.isEmpty();
+        });
         messageService.reload();
+    }
+
+    private boolean prepareMessageMigration(boolean freshInstall) {
+        try {
+            MessageMigrationBackup.prepare(getDataFolder().toPath().resolve("messages.yml"),
+                    getConfig().getInt("config-version", 0), freshInstall);
+            return true;
+        } catch (IOException exception) {
+            getLogger().severe("Could not back up messages.yml; message migration remains pending: "
+                    + exception.getMessage());
+            return false;
+        }
+    }
+
+    private YamlConfiguration bundledYaml(String resource) {
+        try (InputStream stream = getResource(resource)) {
+            if (stream == null) {
+                throw new IllegalStateException("Missing bundled " + resource);
+            }
+            return YamlConfiguration.loadConfiguration(new InputStreamReader(stream, StandardCharsets.UTF_8));
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("Could not read bundled " + resource, exception);
+        }
+    }
+
+    private void installFreshResource(String resource) {
+        Path target = getDataFolder().toPath().resolve(resource);
+        if (Files.notExists(target)) {
+            saveResource(resource, false);
+        }
     }
 
     private boolean migrateAnnounceThresholdLore(FileConfiguration config) {
@@ -246,7 +340,7 @@ public final class FoKillstreak extends JavaPlugin {
                 .addSubcommand(versionSubcommand())
                 .addSubcommand(reloadSubcommand())
                 .addSubcommand(editorSubcommand())
-                .addSubcommand(AdminSetSubcommand.create(streakStorage, adminSounds))
+                .addSubcommand(AdminSetSubcommand.create(streakStorage, killstreakService, adminSounds))
                 .register();
 
         PlayerCommand playerCommand = new PlayerCommand(messageService, guiManager, adminSounds);

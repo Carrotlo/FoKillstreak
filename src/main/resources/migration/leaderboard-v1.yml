@@ -1,0 +1,23 @@
+# Public FoKillstreak leaderboard GUI.
+# Slots are 0-based inventory slots.
+# Color tokens: {theme}, {muted}, {white}, {good}, {bad}
+# Line placeholders: {rank}, {player}, {streak}
+title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+rows: 3
+filler-material: LIGHT_GRAY_STAINED_GLASS_PANE
+
+current:
+  slot: 11
+  material: DIAMOND_SWORD
+  name: "{theme}ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+
+best:
+  slot: 15
+  material: NETHER_STAR
+  name: "{theme}ʙᴇꜱᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+
+lines:
+  entry: "{theme}#{rank} {white}{player} {muted}- {theme}{streak}"
+  empty: "{muted}#{rank} Empty"
+  position: "{white}Your position: {theme}#{rank} {muted}({streak})"
+  unranked: "{white}Your position: {muted}Unranked"

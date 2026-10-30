@@ -6,9 +6,9 @@ import io.papermc.paper.registry.data.dialog.DialogBase;
 import io.papermc.paper.registry.data.dialog.action.DialogAction;
 import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
+import me.foesio.core.dialog.DialogIcons;
 import me.foesio.core.dialog.NativeDialogSupport;
 import me.foesio.core.message.FoMessageService;
-import me.foesio.core.text.FoText;
 import me.foesio.foKillstreak.FoKillstreak;
 import me.foesio.foKillstreak.config.GuiConfigService;
 import me.foesio.foKillstreak.data.LeaderboardEntry;
@@ -17,19 +17,16 @@ import me.foesio.foKillstreak.data.StreakStorage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class PaperDialogLeaderboardService implements LeaderboardDialogService {
     private static final Pattern HEX_PATTERN = Pattern.compile("(?i)#[0-9a-f]{6}");
-    private static final int BUTTON_WIDTH = 150;
     private static final ClickCallback.Options TAB_CLICK_OPTIONS = ClickCallback.Options.builder()
             .uses(1)
             .lifetime(ClickCallback.DEFAULT_LIFETIME)
@@ -58,7 +55,7 @@ public final class PaperDialogLeaderboardService implements LeaderboardDialogSer
         }
 
         try {
-            Dialog dialog = createDialog(type);
+            Dialog dialog = createDialog(player, type);
             player.closeInventory();
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) {
@@ -77,61 +74,67 @@ public final class PaperDialogLeaderboardService implements LeaderboardDialogSer
         }
     }
 
-    private Dialog createDialog(LeaderboardType type) {
-        Component title = component(guiString("native.title", "Top Killstreaks"), color("native.title-color", 0xffffff));
+    private Dialog createDialog(Player player, LeaderboardType type) {
+        Component title = component(player, guiString("native.title"), color("native.title-color"));
         return Dialog.create(builder -> builder.empty()
                 .base(DialogBase.builder(title)
                         .externalTitle(title)
-                        .body(leaderboardBodies(type))
+                        .body(leaderboardBodies(player, type))
                         .canCloseWithEscape(true)
                         .pause(false)
                         .afterAction(DialogBase.DialogAfterAction.NONE)
                         .build())
-                .type(DialogType.multiAction(List.of(tabButton(type, LeaderboardType.CURRENT), tabButton(type, LeaderboardType.BEST)))
-                        .columns(2)
+                .type(DialogType.multiAction(guiConfig.getStringList("native.button-order").stream()
+                        .map(id -> tabButton(player, type, id.equals("current") ? LeaderboardType.CURRENT : LeaderboardType.BEST))
+                        .toList())
+                        .columns(guiInt("native.columns"))
                         .build())
         );
     }
 
-    private List<DialogBody> leaderboardBodies(LeaderboardType type) {
+    private List<DialogBody> leaderboardBodies(Player player, LeaderboardType type) {
         int limit = leaderboardLimit();
-        int width = guiInt("native.body-width", 260);
+        int width = guiInt("native.body-width");
         List<LeaderboardEntry> top = storage.top(type, limit);
         List<DialogBody> bodies = new ArrayList<>();
-        String format = guiString("native.line-format", "{rank_color}#{rank} {white}{player} &8- &c{skull} {white}{streak}");
-        String skull = guiString("native.symbol", "☠");
-        String emptyPlayer = guiString("native.empty-player", "---");
-        String emptyStreak = guiString("native.empty-streak", "---");
+        String format = guiString("native.line-format");
+        String skull = guiString("native.symbol");
+        String emptyPlayer = guiString("native.empty-player");
+        String emptyStreak = guiString("native.empty-streak");
         for (int rank = 1; rank <= limit; rank++) {
             if (top.size() >= rank) {
                 LeaderboardEntry entry = top.get(rank - 1);
-                bodies.add(DialogBody.plainMessage(leaderboardLine(format, entry.rank(), entry.name(), String.valueOf(entry.streak()), skull), width));
+                bodies.add(DialogBody.plainMessage(leaderboardLine(player, format, entry.rank(), entry.name(), guiConfig.formatNumber(entry.streak()), skull), width));
             } else {
-                bodies.add(DialogBody.plainMessage(leaderboardLine(format, rank, emptyPlayer, emptyStreak, skull), width));
+                bodies.add(DialogBody.plainMessage(leaderboardLine(player, format, rank, emptyPlayer, emptyStreak, skull), width));
             }
         }
         return bodies;
     }
 
-    private Component leaderboardLine(String format, int rank, String player, String streak, String skull) {
-        String line = messages.renderTemplate(format, Map.of(
-                "rank", String.valueOf(rank),
+    private Component leaderboardLine(Player viewer, String format, int rank, String player, String streak, String skull) {
+        String line = messages.renderTemplateForViewer(viewer, format, Map.of(
+                "rank", guiConfig.formatNumber(rank),
                 "rank_color", rankColorToken(rank),
                 "player", player,
                 "streak", streak,
                 "skull", skull
         ));
-        return LegacyComponentSerializer.legacySection().deserialize(line).colorIfAbsent(rankTextColor(rank));
+        Component rendered = DialogIcons.render(viewer, line);
+        TextColor configuredColor = rankTextColor(rank);
+        return configuredColor == null ? rendered : rendered.colorIfAbsent(configuredColor);
     }
 
-    private ActionButton tabButton(LeaderboardType selected, LeaderboardType buttonType) {
+    private ActionButton tabButton(Player player, LeaderboardType selected, LeaderboardType buttonType) {
         boolean isSelected = selected == buttonType;
-        ActionButton.Builder builder = ActionButton.builder(component(tabButtonLabel(buttonType, isSelected), tabButtonColor(isSelected)))
-                .width(BUTTON_WIDTH);
+        ActionButton.Builder builder = ActionButton.builder(component(player, tabButtonLabel(buttonType, isSelected), tabButtonColor(isSelected)))
+                .width(guiInt("native.button-width"));
         if (isSelected) {
             return builder.action(null).build();
         }
-        builder.tooltip(component(guiString("native.switch-tooltip", "Switch leaderboard"), color("native.tooltip-color", 0xa7b8b0)));
+        if (guiConfig.has("native.switch-tooltip") && !guiString("native.switch-tooltip").isEmpty()) {
+            builder.tooltip(component(player, guiString("native.switch-tooltip"), color("native.tooltip-color")));
+        }
         return builder.action(DialogAction.customClick((view, audience) -> {
             if (audience instanceof Player target) {
                 plugin.getServer().getScheduler().runTask(plugin, () -> plugin.gui().openLeaderboardTab(target, buttonType));
@@ -141,13 +144,13 @@ public final class PaperDialogLeaderboardService implements LeaderboardDialogSer
 
     private String tabButtonLabel(LeaderboardType type, boolean selected) {
         if (selected) {
-            return guiString(nativeSelectedButtonPath(type), selectedButtonFallbackLabel(type));
+            return guiString(nativeSelectedButtonPath(type));
         }
-        return guiString(nativeButtonPath(type), fallbackButtonLabel(type));
+        return guiString(nativeButtonPath(type));
     }
 
     private TextColor tabButtonColor(boolean selected) {
-        return selected ? color("native.selected-button-color", 0xa7b8b0) : color("native.inactive-button-color", 0xffffff);
+        return selected ? color("native.selected-button-color") : color("native.inactive-button-color");
     }
 
     private void fallbackAfterFailure(Player player, Throwable exception) {
@@ -167,52 +170,39 @@ public final class PaperDialogLeaderboardService implements LeaderboardDialogSer
         return type == LeaderboardType.CURRENT ? "native.selected-current-button" : "native.selected-best-button";
     }
 
-    private String fallbackButtonLabel(LeaderboardType type) {
-        if (type == LeaderboardType.CURRENT) {
-            return "{white}Current";
-        }
-        return "{white}Best";
-    }
-
-    private String selectedButtonFallbackLabel(LeaderboardType type) {
-        if (type == LeaderboardType.CURRENT) {
-            return "{muted}☠ Current";
-        }
-        return "{muted}☠ Best";
-    }
-
     private TextColor rankTextColor(int rank) {
         return switch (rank) {
-            case 1 -> color("native.first-color", 0xffd84d);
-            case 2 -> color("native.second-color", 0xc9d1d9);
-            case 3 -> color("native.third-color", 0xd9822b);
-            default -> color("native.default-color", 0xa7b8b0);
+            case 1 -> color("native.first-color");
+            case 2 -> color("native.second-color");
+            case 3 -> color("native.third-color");
+            default -> color("native.default-color");
         };
     }
 
     private String rankColorToken(int rank) {
         String configured = switch (rank) {
-            case 1 -> guiString("native.first-color", "#ffd84d");
-            case 2 -> guiString("native.second-color", "#c9d1d9");
-            case 3 -> guiString("native.third-color", "#d9822b");
-            default -> guiString("native.default-color", "#a7b8b0");
+            case 1 -> guiString("native.first-color");
+            case 2 -> guiString("native.second-color");
+            case 3 -> guiString("native.third-color");
+            default -> guiString("native.default-color");
         };
         return messages.renderTemplate(configured, Map.of());
     }
 
-    private Component component(String text, TextColor color) {
-        Component component = LegacyComponentSerializer.legacySection().deserialize(FoText.color(messages.renderTemplate(text, Map.of())));
+    private Component component(Player viewer, String text, TextColor color) {
+        Component component = DialogIcons.render(viewer,
+                messages.renderTemplateForViewer(viewer, text, Map.of()));
         return color == null ? component : component.colorIfAbsent(color);
     }
 
-    private TextColor color(String path, int fallback) {
-        String configured = guiString(path, String.format(Locale.ROOT, "#%06x", fallback));
+    private TextColor color(String path) {
+        String configured = guiString(path);
         TextColor parsed = parseTextColor(configured);
         if (parsed != null) {
             return parsed;
         }
         parsed = parseTextColor(messages.renderTemplate(configured, Map.of()));
-        return parsed == null ? TextColor.color(fallback) : parsed;
+        return parsed;
     }
 
     private TextColor parseTextColor(String value) {
@@ -254,15 +244,15 @@ public final class PaperDialogLeaderboardService implements LeaderboardDialogSer
         }
     }
 
-    private int guiInt(String path, int fallback) {
-        return guiConfig.getInt(path, fallback);
+    private int guiInt(String path) {
+        return guiConfig.getInt(path, 0);
     }
 
     private int leaderboardLimit() {
-        return Math.max(1, guiInt("native.limit", 10));
+        return guiInt("native.limit");
     }
 
-    private String guiString(String path, String fallback) {
-        return guiConfig.getString(path, fallback);
+    private String guiString(String path) {
+        return guiConfig.getString(path, "");
     }
 }

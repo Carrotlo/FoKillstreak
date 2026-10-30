@@ -1,53 +1,30 @@
-# Public FoKillstreak leaderboard GUI.
-# Slots are 0-based inventory slots.
-# Color tokens: {theme}, {muted}, {white}, {good}, {bad}
-# Line placeholders: {rank}, {player}, {streak}
 title: "&8ꜰᴏᴋɪʟʟꜱᴛʀᴇᴀᴋ"
 rows: 3
-filler-material: LIGHT_GRAY_STAINED_GLASS_PANE
-
 filler:
-  material: LIGHT_GRAY_STAINED_GLASS_PANE
-  custom-model-data: ''
-  name: ' '
+  enabled: true
+  material: "LIGHT_GRAY_STAINED_GLASS_PANE"
+  name: " "
   lore: []
-
-current:
-  slot: 11
-  material: DIAMOND_SWORD
-  custom-model-data: ''
-  name: "{theme}ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
-
-best:
-  slot: 15
-  material: NETHER_STAR
-  custom-model-data: ''
-  name: "{theme}ʙᴇꜱᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
-
-lines:
-  entry: "{theme}#{rank} {white}{player} {muted}- {theme}{streak}"
-  empty: "{muted}#{rank} Empty"
-  position: "{white}Your position: {theme}#{rank} {muted}({streak})"
-  unranked: "{white}Your position: {muted}Unranked"
-
-native:
-  title: "{white}Top Killstreaks"
-  body-width: 260
-  limit: 10
-  symbol: "☠"
-  line-format: "{rank_color}#{rank} {white}{player} &8- &c{skull} {white}{streak}"
-  empty-player: "---"
-  empty-streak: "---"
-  first-color: "#ffd84d"
-  second-color: "#c9d1d9"
-  third-color: "#d9822b"
-  default-color: "#a7b8b0"
-  title-color: "{white}"
-  inactive-button-color: "{white}"
-  tooltip-color: "{muted}"
-  current-button: "{white}Current"
-  best-button: "{white}Best"
-  selected-button-color: "{muted}"
-  selected-current-button: "{muted}☠ Current"
-  selected-best-button: "{muted}☠ Best"
-  switch-tooltip: "{theme}Switch leaderboard"
+buttons:
+  current:
+    slot: 11
+    enabled: true
+    material: "DIAMOND_SWORD"
+    name: "#03fc88ᴄᴜʀʀᴇɴᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+    lore:
+      - "{options}"
+    cycle:
+      selected-format: "{option}"
+      unselected-format: "{option}"
+    action: "leaderboard.current"
+  best:
+    slot: 15
+    enabled: true
+    material: "NETHER_STAR"
+    name: "#03fc88ʙᴇꜱᴛ ᴋɪʟʟꜱᴛʀᴇᴀᴋ"
+    lore:
+      - "{options}"
+    cycle:
+      selected-format: "{option}"
+      unselected-format: "{option}"
+    action: "leaderboard.best"

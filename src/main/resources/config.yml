@@ -1,6 +1,7 @@
 # FoKillstreak behavior settings.
 # Messages, broadcasts, command feedback, and admin GUI text are in messages.yml.
-# The public leaderboard GUI layout/text is in guis/leaderboard.yml.
+# The leaderboard layout and buttons are in guis/leaderboard.yml.
+# Inventory lines and native dialog text are in dialogs/leaderboard.yml.
 
 death-reset:
   # If true, natural deaths do not reset streaks. Only dying to another player resets a streak.
@@ -19,7 +20,7 @@ native-dialogs:
   # Set this to false to always use inventory/chat GUI mode.
   enabled: true
   # Uses the native dialog for /killstreak leaderboards when available.
-  # Set this to false to use the old inventory leaderboard GUI while keeping other dialogs enabled.
+  # Set this to false to use the inventory leaderboard GUI while keeping other dialogs enabled.
   leaderboards: true
   # Sends admins a short warning when native dialogs are enabled but unavailable and the plugin falls back.
   warn-on-fallback: true
